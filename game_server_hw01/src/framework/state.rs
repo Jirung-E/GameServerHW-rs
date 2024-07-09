@@ -4,6 +4,7 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
 };
 use wgpu::util::DeviceExt;
+use cgmath::prelude::*;
 
 use super::vertex::*;
 use super::instance::*;
@@ -117,6 +118,9 @@ const NUM_INSTANCES_PER_ROW: u32 = 10;
 const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(
     NUM_INSTANCES_PER_ROW as f32 * 0.5, 0.0, NUM_INSTANCES_PER_ROW as f32 * 0.5
 );
+
+
+const ROTATION_SPEED: f32 = 2.0 * std::f32::consts::PI / 60.0 / 100.0;
 
 
 
@@ -358,7 +362,6 @@ impl<'a> State<'a> {
 
         let num_indices = INDICES.len() as u32;
 
-        use cgmath::prelude::*;
         let instances = (0..NUM_INSTANCES_PER_ROW).flat_map(|z| {
             (0..NUM_INSTANCES_PER_ROW).map(move |x| {
                 let position = cgmath::Vector3 {
@@ -392,7 +395,7 @@ impl<'a> State<'a> {
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Instance Buffer"),
                 contents: bytemuck::cast_slice(&instance_data),
-                usage: wgpu::BufferUsages::VERTEX,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             }
         );
 
@@ -446,7 +449,27 @@ impl<'a> State<'a> {
     pub fn update(&mut self) {
         self.camera_controller.update_camera(&mut self.camera);
         self.camera_uniform.update_view_proj(&self.camera);
-        self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
+        self.queue.write_buffer(
+            &self.camera_buffer, 
+            0, 
+            bytemuck::cast_slice(&[self.camera_uniform])
+        );
+
+        for instance in &mut self.instances {
+            let amount = cgmath::Quaternion::from_angle_y(
+                cgmath::Rad(ROTATION_SPEED)
+            );
+            let current = instance.rotation;
+            instance.rotation = amount * current;
+        }
+        let instance_data = self.instances.iter()
+            .map(Instance::to_raw)
+            .collect::<Vec<_>>();
+        self.queue.write_buffer(
+            &self.instance_buffer,
+            0,
+            bytemuck::cast_slice(&instance_data),
+        );
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -474,11 +497,12 @@ impl<'a> State<'a> {
                 timestamp_writes: None,
             });
 
+            render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
             
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
             render_pass.draw_indexed(0..self.num_indices, 0, 0..self.instances.len() as _);
