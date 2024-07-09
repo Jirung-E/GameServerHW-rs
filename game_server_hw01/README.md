@@ -10,7 +10,7 @@
 - [x] Buffers and Indices
 - [ ] Textures and bind groups      >>>> 안할거임
 - [x] Uniform buffers and a 3d camera
-- [ ] Instancing
+- [x] Instancing
 - [ ] The Depth Buffer
 - [ ] Model Loading                 >>>> 여기까지만 해도 될듯
 
