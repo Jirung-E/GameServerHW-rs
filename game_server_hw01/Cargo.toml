@@ -10,6 +10,13 @@ log = "0.4.22"
 wgpu = "0.20.1"
 bytemuck = { version = "1.16.1", features = ["derive"] }
 cgmath = "0.18.0"
+tobj = { version = "3.2.1", features = ["async"]}
+anyhow = "1.0"
 
 # futures = "0.3.30"
 tokio = { version = "1.38.0", features = ["full"] }
+
+[build-dependencies]
+anyhow = "1.0"
+fs_extra = "1.2"
+glob = "0.3"

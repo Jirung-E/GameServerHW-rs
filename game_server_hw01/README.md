@@ -12,7 +12,7 @@
 - [x] Uniform buffers and a 3d camera
 - [x] Instancing
 - [x] The Depth Buffer
-- [ ] Model Loading                 >>>> 여기까지만 해도 될듯
+- [x] Model Loading
 
 **Intermediate**
 - [ ] Working with Lights
