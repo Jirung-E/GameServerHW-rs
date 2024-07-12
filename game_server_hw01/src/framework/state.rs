@@ -498,8 +498,8 @@ impl<'a> State<'a> {
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
             
             for model in self.models.iter() {
-                // render_pass.draw_mesh_instanced(&model.meshes[0], 0..self.instances.len() as u32);
-                render_pass.draw_mesh(&model.meshes[0]);
+                render_pass.draw_mesh_instanced(&model.meshes[0], 0..self.instances.len() as u32);
+                // render_pass.draw_mesh(&model.meshes[0]);
             }
         }
     

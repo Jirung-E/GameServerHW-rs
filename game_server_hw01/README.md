@@ -1,6 +1,9 @@
 ### References
 - [Learn Wgpu](https://sotrh.github.io/learn-wgpu/)
 
+### TODO
+- [ ] 오브젝트에 모델 할당(모델은 인스턴싱됨)
+
 #### Study
 **Beginner**  
 [code](https://github.com/sotrh/learn-wgpu/tree/master/code/beginner)
@@ -12,7 +15,7 @@
 - [x] Uniform buffers and a 3d camera
 - [x] Instancing
 - [x] The Depth Buffer
-- [x] Model Loading     >>>> TODO: 모델 색 설정 가능하도록 변경
+- [x] Model Loading
 
 **Intermediate**
 - [ ] Working with Lights
