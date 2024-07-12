@@ -147,7 +147,7 @@ pub struct State<'a> {
     camera_bind_group: wgpu::BindGroup,
     camera_controller: CameraController,
 
-    obj_model: Model,
+    models: Vec<Model>,
 }
 
 
@@ -379,7 +379,10 @@ impl<'a> State<'a> {
 
         let camera_controller = CameraController::new(0.01);
 
-        let obj_model = Model::load("cube.obj", &device, &queue).await.unwrap();
+        let models = vec![
+            Model::load("cube.obj", &device, &queue).await.unwrap(),
+            Model::load("airplane.obj", &device, &queue).await.unwrap(),
+        ];
 
 
         Self {
@@ -405,7 +408,7 @@ impl<'a> State<'a> {
             camera_bind_group,
             camera_controller,
 
-            obj_model,
+            models,
         }
     }
 
@@ -493,7 +496,10 @@ impl<'a> State<'a> {
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
             
-            render_pass.draw_mesh_instanced(&self.obj_model.meshes[0], 0..self.instances.len() as u32);
+            for model in self.models.iter() {
+                // render_pass.draw_mesh_instanced(&model.meshes[0], 0..self.instances.len() as u32);
+                render_pass.draw_mesh(&model.meshes[0]);
+            }
         }
     
         // submit will accept anything that implements IntoIter
