@@ -8,7 +8,7 @@
 - [x] The Surface
 - [x] The Pipeline
 - [x] Buffers and Indices
-- [ ] Textures and bind groups
+- [ ] Textures and bind groups      (https://sotrh.github.io/learn-wgpu/beginner/tutorial5-textures/#pipelinelayout)
 - [x] Uniform buffers and a 3d camera
 - [x] Instancing
 - [x] The Depth Buffer
