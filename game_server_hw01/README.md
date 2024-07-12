@@ -12,7 +12,7 @@
 - [x] Uniform buffers and a 3d camera
 - [x] Instancing
 - [x] The Depth Buffer
-- [x] Model Loading
+- [x] Model Loading     >>>> TODO: 모델 색 설정 가능하도록 변경
 
 **Intermediate**
 - [ ] Working with Lights
