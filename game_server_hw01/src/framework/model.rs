@@ -1,3 +1,6 @@
+use super::color::*;
+
+
 pub trait Vertex {
     fn desc() -> wgpu::VertexBufferLayout<'static>;
 }
@@ -7,7 +10,7 @@ pub trait Vertex {
 pub struct ModelVertex {
     pub position: [f32; 3],
     // pub tex_coords: [f32; 2],
-    pub color: [f32; 4],
+    pub base_color: Color,
     pub normal: [f32; 3],
 }
 
@@ -62,7 +65,7 @@ impl Model {
         device: &wgpu::Device,
         _queue: &wgpu::Queue,
         // layout: &wgpu::BindGroupLayout,
-        color: [f32; 4],
+        base_color: Color,
     ) -> anyhow::Result<Model> {
         use std::io::{BufReader, Cursor};
         use wgpu::util::DeviceExt;
@@ -124,7 +127,7 @@ impl Model {
                                     m.mesh.positions[i * 3 + 1],
                                     m.mesh.positions[i * 3 + 2],
                                 ],
-                                color,
+                                base_color,
                                 // tex_coords: [m.mesh.texcoords[i * 2], 1.0 - m.mesh.texcoords[i * 2 + 1]],
                                 normal: [0.0, 0.0, 0.0],
                             }
@@ -137,7 +140,7 @@ impl Model {
                                     m.mesh.positions[i * 3 + 2],
                                 ],
                                 // tex_coords: [m.mesh.texcoords[i * 2], 1.0 - m.mesh.texcoords[i * 2 + 1]],
-                                color,
+                                base_color,
                                 normal: [
                                     m.mesh.normals[i * 3],
                                     m.mesh.normals[i * 3 + 1],
