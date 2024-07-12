@@ -7,6 +7,7 @@ pub trait Vertex {
 pub struct ModelVertex {
     pub position: [f32; 3],
     // pub tex_coords: [f32; 2],
+    pub color: [f32; 4],
     pub normal: [f32; 3],
 }
 
@@ -61,6 +62,7 @@ impl Model {
         device: &wgpu::Device,
         _queue: &wgpu::Queue,
         // layout: &wgpu::BindGroupLayout,
+        color: [f32; 4],
     ) -> anyhow::Result<Model> {
         use std::io::{BufReader, Cursor};
         use wgpu::util::DeviceExt;
@@ -115,17 +117,19 @@ impl Model {
             .map(|m| {
                     let vertices = (0..m.mesh.positions.len() / 3)
                     .map(|i| {
-                        if m.mesh.normals.is_empty(){
+                        if m.mesh.normals.is_empty() {
                             ModelVertex {
                                 position: [
                                     m.mesh.positions[i * 3],
                                     m.mesh.positions[i * 3 + 1],
                                     m.mesh.positions[i * 3 + 2],
                                 ],
+                                color,
                                 // tex_coords: [m.mesh.texcoords[i * 2], 1.0 - m.mesh.texcoords[i * 2 + 1]],
                                 normal: [0.0, 0.0, 0.0],
                             }
-                        }else{
+                        }
+                        else {
                             ModelVertex {
                                 position: [
                                     m.mesh.positions[i * 3],
@@ -133,6 +137,7 @@ impl Model {
                                     m.mesh.positions[i * 3 + 2],
                                 ],
                                 // tex_coords: [m.mesh.texcoords[i * 2], 1.0 - m.mesh.texcoords[i * 2 + 1]],
+                                color,
                                 normal: [
                                     m.mesh.normals[i * 3],
                                     m.mesh.normals[i * 3 + 1],
