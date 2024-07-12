@@ -20,4 +20,43 @@ impl Color {
         
         Self(r, g, b, a)
     }
+
+    pub fn from_rgb(r: f32, g: f32, b: f32) -> Self {
+        Self::from_rgba(r, g, b, 1.0)
+    }
+
+    pub fn r(&self) -> f32 {
+        self.0
+    }
+
+    pub fn g(&self) -> f32 {
+        self.1
+    }
+
+    pub fn b(&self) -> f32 {
+        self.2
+    }
+
+    pub fn a(&self) -> f32 {
+        self.3
+    }
 }
+
+impl From<[f32; 4]> for Color {
+    fn from(arr: [f32; 4]) -> Self {
+        Self::from_rgba(arr[0], arr[1], arr[2], arr[3])
+    }
+}
+
+impl From<[f32; 3]> for Color {
+    fn from(arr: [f32; 3]) -> Self {
+        Self::from_rgba(arr[0], arr[1], arr[2], 1.0)
+    }
+}
+
+impl Into<[f32; 4]> for Color {
+    fn into(self) -> [f32; 4] {
+        [self.0, self.1, self.2, self.3]
+    }
+}
+
