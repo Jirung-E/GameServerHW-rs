@@ -12,6 +12,7 @@ bytemuck = { version = "1.16.1", features = ["derive"] }
 cgmath = "0.18.0"
 tobj = { version = "3.2.1", features = ["async"]}
 anyhow = "1.0"
+image = { version = "0.24", default-features = false, features = ["png", "jpeg"] } 
 
 # futures = "0.3.30"
 tokio = { version = "1.38.0", features = ["full"] }
