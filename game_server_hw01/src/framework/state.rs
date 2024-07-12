@@ -381,8 +381,8 @@ impl<'a> State<'a> {
         let camera_controller = CameraController::new(0.01);
 
         let models = vec![
-            Model::load("cube.obj", &device, &queue, Color::WHITE).await.unwrap(),
-            Model::load("airplane.obj", &device, &queue, Color::MAGENTA).await.unwrap(),
+            Model::load("cube.obj", &device, &queue, 1.0, Color::WHITE).await.unwrap(),
+            Model::load("airplane.obj", &device, &queue, 0.1, Color::MAGENTA).await.unwrap(),
         ];
 
 

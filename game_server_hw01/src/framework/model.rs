@@ -37,15 +37,6 @@ impl Vertex for ModelVertex {
 
 
 
-
-
-
-pub struct Material {
-    pub name: String,
-    // pub diffuse_texture: texture::Texture,
-    pub bind_group: wgpu::BindGroup,
-}
-
 pub struct Mesh {
     pub name: String,
     pub vertex_buffer: wgpu::Buffer,
@@ -65,6 +56,7 @@ impl Model {
         device: &wgpu::Device,
         _queue: &wgpu::Queue,
         // layout: &wgpu::BindGroupLayout,
+        scale_factor: f32,
         base_color: Color,
     ) -> anyhow::Result<Model> {
         use std::io::{BufReader, Cursor};
@@ -89,32 +81,6 @@ impl Model {
         )
         .await?;
     
-        // let mut materials = Vec::new();
-        // for m in obj_materials? {
-        //     // let diffuse_texture = load_texture(&m.diffuse_texture, device, queue).await?;
-        //     let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        //         layout,
-        //         // entries: &[
-        //         //     wgpu::BindGroupEntry {
-        //         //         binding: 0,
-        //         //         resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
-        //         //     },
-        //         //     wgpu::BindGroupEntry {
-        //         //         binding: 1,
-        //         //         resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
-        //         //     },
-        //         // ],
-        //         entries: &[],
-        //         label: None,
-        //     });
-    
-        //     materials.push(Material {
-        //         name: m.name,
-        //         // diffuse_texture,
-        //         bind_group,
-        //     })
-        // }
-    
         let meshes = models
             .into_iter()
             .map(|m| {
@@ -123,9 +89,9 @@ impl Model {
                         if m.mesh.normals.is_empty() {
                             ModelVertex {
                                 position: [
-                                    m.mesh.positions[i * 3],
-                                    m.mesh.positions[i * 3 + 1],
-                                    m.mesh.positions[i * 3 + 2],
+                                    m.mesh.positions[i * 3] * scale_factor,
+                                    m.mesh.positions[i * 3 + 1] * scale_factor,
+                                    m.mesh.positions[i * 3 + 2] * scale_factor,
                                 ],
                                 base_color,
                                 // tex_coords: [m.mesh.texcoords[i * 2], 1.0 - m.mesh.texcoords[i * 2 + 1]],
@@ -135,9 +101,9 @@ impl Model {
                         else {
                             ModelVertex {
                                 position: [
-                                    m.mesh.positions[i * 3],
-                                    m.mesh.positions[i * 3 + 1],
-                                    m.mesh.positions[i * 3 + 2],
+                                    m.mesh.positions[i * 3] * scale_factor,
+                                    m.mesh.positions[i * 3 + 1] * scale_factor,
+                                    m.mesh.positions[i * 3 + 2] * scale_factor,
                                 ],
                                 // tex_coords: [m.mesh.texcoords[i * 2], 1.0 - m.mesh.texcoords[i * 2 + 1]],
                                 base_color,
