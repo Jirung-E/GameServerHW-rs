@@ -1,23 +1,36 @@
-pub struct Instance {
+pub struct Transform {
     pub position: cgmath::Vector3<f32>,
     pub rotation: cgmath::Quaternion<f32>,
+    // pub scale: f32,
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct InstanceRaw {
-    model: [[f32; 4]; 4]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct TransformRaw {
+    transform_matrix: [[f32; 4]; 4]
 }
 
-impl Instance {
-    pub fn to_raw(&self) -> InstanceRaw {
-        InstanceRaw {
-            model: (cgmath::Matrix4::from_translation(self.position) * cgmath::Matrix4::from(self.rotation)).into()
+
+impl Transform {
+    pub fn to_raw(&self) -> TransformRaw {
+        TransformRaw {
+            transform_matrix: (cgmath::Matrix4::from_translation(self.position) * cgmath::Matrix4::from(self.rotation)).into()
         }
     }
 }
 
-impl InstanceRaw {
+impl Default for Transform {
+    fn default() -> Self {
+        Self {
+            position: cgmath::Vector3::new(0.0, 0.0, 0.0),
+            rotation: cgmath::Quaternion::new(1.0, 0.0, 0.0, 0.0),
+            // scale: 1.0,
+        }
+    }
+}
+
+
+impl TransformRaw {
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
         use std::mem;
 

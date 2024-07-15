@@ -42,12 +42,15 @@ pub struct Mesh {
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
     pub num_elements: u32,
-    pub material: usize,
+    // pub material: usize,
 }
+
+use super::transform::*;
 
 pub struct Model {
     pub meshes: Vec<Mesh>,
     // pub materials: Vec<Material>,
+    pub instances: Vec<*const Transform>,
 }
 
 impl Model {
@@ -133,12 +136,16 @@ impl Model {
                     vertex_buffer,
                     index_buffer,
                     num_elements: m.mesh.indices.len() as u32,
-                    material: m.mesh.material_id.unwrap_or(0),
+                    // material: m.mesh.material_id.unwrap_or(0),
                 }
             })
             .collect::<Vec<_>>();
     
-        Ok(Model { meshes })
+        Ok(Model { meshes, instances: Vec::new() })
+    }
+
+    pub fn add_instance(&mut self, transform: &Transform) {
+        self.instances.push(transform);
     }
 }
 

@@ -7,11 +7,13 @@ use wgpu::util::DeviceExt;
 use cgmath::prelude::*;
 
 // use super::vertex::*;
-use super::instance::*;
-use super::camera::*;
+// use super::instance::*;
 use super::texture::*;
-use super::model::*;
 use super::color::*;
+use super::model::*;
+use super::transform::*;
+use super::object::*;
+use super::camera::*;
 
 
 struct CameraController {
@@ -103,22 +105,6 @@ impl CameraController {
 
 
 
-// const VERTICES: &[Vertex] = &[
-//     Vertex { position: [-0.0868241, 0.49240386, 0.0], color: [1.0, 0.0, 0.0] }, // A
-//     Vertex { position: [-0.49513406, 0.06958647, 0.0], color: [0.0, 1.0, 0.0] }, // B
-//     Vertex { position: [-0.21918549, -0.44939706, 0.0], color: [0.0, 0.0, 1.0] }, // C
-//     Vertex { position: [0.35966998, -0.3473291, 0.0], color: [1.0, 1.0, 0.0] }, // D
-//     Vertex { position: [0.44147372, 0.2347359, 0.0], color: [0.0, 1.0, 1.0] }, // E
-// ];
-
-// const INDICES: &[u16] = &[
-//     0, 1, 4,
-//     1, 2, 4,
-//     2, 3, 4,
-// ];
-
-const NUM_INSTANCES_PER_ROW: u32 = 10;
-
 const ROTATION_SPEED: f32 = 2.0 * std::f32::consts::PI / 60.0 / 100.0;
 
 
@@ -137,7 +123,6 @@ pub struct State<'a> {
 
     render_pipeline: wgpu::RenderPipeline,
 
-    instances: Vec<Instance>,
     instance_buffer: wgpu::Buffer,
 
     depth_texture: Texture,
@@ -149,6 +134,8 @@ pub struct State<'a> {
     camera_controller: CameraController,
 
     models: Vec<Model>,
+
+    objects: Vec<Object>,
 }
 
 
@@ -297,7 +284,7 @@ impl<'a> State<'a> {
                 entry_point: "vs_main",
                 buffers: &[
                     ModelVertex::desc(),
-                    InstanceRaw::desc(),
+                    TransformRaw::desc(),
                 ],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
@@ -345,45 +332,31 @@ impl<'a> State<'a> {
             a: 1.0,
         };
 
-        const SPACE_BETWEEN: f32 = 3.0;
-        let instances = (0..NUM_INSTANCES_PER_ROW).flat_map(|z| {
-            (0..NUM_INSTANCES_PER_ROW).map(move |x| {
-                let x = SPACE_BETWEEN * (x as f32 - NUM_INSTANCES_PER_ROW as f32 / 2.0);
-                let z = SPACE_BETWEEN * (z as f32 - NUM_INSTANCES_PER_ROW as f32 / 2.0);
-        
-                let position = cgmath::Vector3 { x, y: 0.0, z };
-        
-                let rotation = if position.is_zero() {
-                    cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0))
-                } else {
-                    cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
-                };
-        
-                Instance {
-                    position, rotation,
-                }
-            })
-        }).collect::<Vec<_>>();
-
-        let instance_data = instances.iter()
-            .map(Instance::to_raw)
-            .collect::<Vec<_>>();
-        let instance_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Instance Buffer"),
-                contents: bytemuck::cast_slice(&instance_data),
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            }
-        );
-
         let depth_texture = Texture::create_depth_texture(&device, &config, "depth_texture");
 
         let camera_controller = CameraController::new(0.01);
 
-        let models = vec![
+        
+        let instance_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Instance Buffer"),
+                contents: &[],
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            }
+        );
+
+        let mut models = vec![
             Model::load("cube.obj", &device, &queue, 1.0, Color::WHITE).await.unwrap(),
             Model::load("airplane.obj", &device, &queue, 0.1, Color::MAGENTA).await.unwrap(),
         ];
+
+        let mut objects = vec![
+            Object::new(),
+            Object::new(),
+        ];
+
+        objects[0].set_model(&mut models[0]);
+        objects[1].set_model(&mut models[1]);
 
 
         Self {
@@ -398,7 +371,6 @@ impl<'a> State<'a> {
 
             render_pipeline,
 
-            instances,
             instance_buffer,
 
             depth_texture,
@@ -410,6 +382,8 @@ impl<'a> State<'a> {
             camera_controller,
 
             models,
+
+            objects,
         }
     }
 
@@ -441,21 +415,11 @@ impl<'a> State<'a> {
             bytemuck::cast_slice(&[self.camera_uniform])
         );
 
-        for instance in &mut self.instances {
-            let amount = cgmath::Quaternion::from_angle_y(
+        for object in self.objects.iter_mut() {
+            object.transform.rotation = cgmath::Quaternion::from_angle_y(
                 cgmath::Rad(ROTATION_SPEED)
-            );
-            let current = instance.rotation;
-            instance.rotation = amount * current;
+            ) * object.transform.rotation;
         }
-        let instance_data = self.instances.iter()
-            .map(Instance::to_raw)
-            .collect::<Vec<_>>();
-        self.queue.write_buffer(
-            &self.instance_buffer,
-            0,
-            bytemuck::cast_slice(&instance_data),
-        );
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -492,14 +456,28 @@ impl<'a> State<'a> {
                 timestamp_writes: None,
             });
 
+                
+            let instance_data = self.models.iter()
+                .flat_map(|model| model.instances.iter())
+                .map(|instance| unsafe { (**instance).to_raw() })
+                .collect::<Vec<_>>();
+            // println!("{:?}", instance_data);
+
+            self.instance_buffer = self.device.create_buffer_init(
+                &wgpu::util::BufferInitDescriptor {
+                    label: Some("Instance Buffer"),
+                    contents: bytemuck::cast_slice(&instance_data),
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                }
+            );
+
             render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
 
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
             
             for model in self.models.iter() {
-                render_pass.draw_mesh_instanced(&model.meshes[0], 0..self.instances.len() as u32);
-                // render_pass.draw_mesh(&model.meshes[0]);
+                render_pass.draw_mesh_instanced(&model.meshes[0], 0..model.instances.len() as u32);
             }
         }
     
