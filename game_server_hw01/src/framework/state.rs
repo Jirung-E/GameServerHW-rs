@@ -346,17 +346,25 @@ impl<'a> State<'a> {
         );
 
         let mut models = vec![
-            Model::load("cube.obj", &device, &queue, 1.0, Color::WHITE).await.unwrap(),
+            Model::load("cube.obj", &device, &queue, 0.5, Color::WHITE).await.unwrap(),
+            Model::load("cube.obj", &device, &queue, 0.5, Color::MAGENTA).await.unwrap(),
             Model::load("knight.obj", &device, &queue, 1.0, Color::MAGENTA).await.unwrap(),
         ];
 
-        let mut objects = vec![
-            Object::new(),
-            Object::new(),
-        ];
+        let mut objects = (0..64)
+            .map(|_| Object::new())
+            .collect::<Vec<_>>();
 
-        objects[0].set_model(&mut models[0]);
-        objects[1].set_model(&mut models[1]);
+        for (i, object) in objects.iter_mut().enumerate() {
+            let x = i % 8;
+            let z = i / 8;
+            object.transform.position = cgmath::Vector3::new(
+                x as f32 - 3.5,
+                0.0,
+                z as f32 - 3.5,
+            );
+            object.set_model(&mut models[(x+z) & 1]);
+        }
 
 
         Self {
@@ -415,7 +423,7 @@ impl<'a> State<'a> {
             bytemuck::cast_slice(&[self.camera_uniform])
         );
 
-        for object in self.objects.iter_mut() {
+        for object in self.objects[64..].iter_mut() {
             object.transform.rotation = cgmath::Quaternion::from_angle_y(
                 cgmath::Rad(ROTATION_SPEED)
             ) * object.transform.rotation;
@@ -476,8 +484,10 @@ impl<'a> State<'a> {
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
             
+            let mut offset = 0;
             for model in self.models.iter() {
-                render_pass.draw_mesh_instanced(&model.meshes[0], 0..model.instances.len() as u32);
+                render_pass.draw_mesh_instanced(&model.meshes[0], offset..offset + model.instances.len() as u32);
+                offset += model.instances.len() as u32;
             }
         }
     
