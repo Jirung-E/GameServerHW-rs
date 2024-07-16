@@ -347,7 +347,7 @@ impl<'a> State<'a> {
 
         let mut models = vec![
             Model::load("cube.obj", &device, &queue, 1.0, Color::WHITE).await.unwrap(),
-            Model::load("White_Knight.obj", &device, &queue, 1.0, Color::MAGENTA).await.unwrap(),
+            Model::load("knight.obj", &device, &queue, 1.0, Color::MAGENTA).await.unwrap(),
         ];
 
         let mut objects = vec![
