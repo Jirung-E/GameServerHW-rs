@@ -6,8 +6,6 @@ use winit::{
 use wgpu::util::DeviceExt;
 use cgmath::prelude::*;
 
-// use super::vertex::*;
-// use super::instance::*;
 use super::texture::*;
 use super::color::*;
 use super::model::*;
@@ -47,19 +45,20 @@ impl CameraController {
                 ..
             } => {
                 let is_pressed = *state == ElementState::Pressed;
-                match keycode {KeyCode::KeyW | KeyCode::ArrowUp => {
+                match keycode {
+                    KeyCode::ArrowUp => {
                         self.is_forward_pressed = is_pressed;
                         true
                     }
-                    KeyCode::KeyA | KeyCode::ArrowLeft => {
+                    KeyCode::ArrowLeft => {
                         self.is_left_pressed = is_pressed;
                         true
                     }
-                    KeyCode::KeyS | KeyCode::ArrowDown => {
+                    KeyCode::ArrowDown => {
                         self.is_backward_pressed = is_pressed;
                         true
                     }
-                    KeyCode::KeyD | KeyCode::ArrowRight => {
+                    KeyCode::ArrowRight => {
                         self.is_right_pressed = is_pressed;
                         true
                     }
@@ -360,9 +359,9 @@ impl<'a> State<'a> {
             let x = i % 8;
             let z = i / 8;
             object.transform.position = cgmath::Vector3::new(
-                x as f32 - 3.5,
-                0.0,
-                z as f32 - 3.5,
+                x as f32,
+                -0.5,
+                z as f32
             );
             object.set_model(&mut models[(x+z) & 1]);
         }
@@ -370,18 +369,18 @@ impl<'a> State<'a> {
         objects.push(Object::new());
         objects.last_mut().unwrap().set_model(&mut models[2]);
         objects.last_mut().unwrap().transform.position = cgmath::Vector3::new(
-            2.5,
-            0.0,
-            0.5,
+            3.0,
+            0.1,
+            2.0,
         );
 
-        objects.push(Object::new());
-        objects.last_mut().unwrap().set_model(&mut models[3]);
-        objects.last_mut().unwrap().transform.position = cgmath::Vector3::new(
-            -2.5,
-            0.0,
-            -0.5,
-        );
+        // objects.push(Object::new());
+        // objects.last_mut().unwrap().set_model(&mut models[3]);
+        // objects.last_mut().unwrap().transform.position = cgmath::Vector3::new(
+        //     -2.5,
+        //     0.0,
+        //     -0.5,
+        // );
 
 
         Self {
@@ -428,7 +427,43 @@ impl<'a> State<'a> {
     }
 
     pub fn input(&mut self, event: &WindowEvent) -> bool {
-        self.camera_controller.process_events(event)
+        if self.camera_controller.process_events(event) {
+            return true;
+        }
+
+        match event {
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        state: ElementState::Pressed,
+                        physical_key: PhysicalKey::Code(keycode),
+                        repeat: false,
+                        ..
+                    },
+                ..
+            } => {
+                match keycode {
+                    KeyCode::KeyW => {
+                        self.objects.last_mut().unwrap().transform.position.z -= 1.0;
+                        true
+                    }
+                    KeyCode::KeyA => {
+                        self.objects.last_mut().unwrap().transform.position.x -= 1.0;
+                        true
+                    }
+                    KeyCode::KeyS => {
+                        self.objects.last_mut().unwrap().transform.position.z += 1.0;
+                        true
+                    }
+                    KeyCode::KeyD => {
+                        self.objects.last_mut().unwrap().transform.position.x += 1.0;
+                        true
+                    }
+                    _ => false,
+                }
+            }
+            _ => false,
+        }
     }
 
     pub fn update(&mut self) {
