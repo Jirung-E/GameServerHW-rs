@@ -11,6 +11,9 @@ impl Color {
     pub const MAGENTA: Color    = Color(1.0, 0.0, 1.0, 1.0);
     pub const WHITE: Color      = Color(1.0, 1.0, 1.0, 1.0);
     pub const BLACK: Color      = Color(0.0, 0.0, 0.0, 1.0);
+    pub const GRAY: Color       = Color(0.5, 0.5, 0.5, 1.0);
+    pub const LIGHT_GRAY: Color = Color(0.75, 0.75, 0.75, 1.0);
+    pub const DARK_GRAY: Color  = Color(0.25, 0.25, 0.25, 1.0);
 
     pub fn from_rgba(r: f32, g: f32, b: f32, a: f32) -> Self {
         let r = r.clamp(0.0, 1.0);

@@ -346,9 +346,10 @@ impl<'a> State<'a> {
         );
 
         let mut models = vec![
-            Model::load("cube.obj", &device, &queue, 0.5, Color::WHITE).await.unwrap(),
-            Model::load("cube.obj", &device, &queue, 0.5, Color::MAGENTA).await.unwrap(),
-            Model::load("knight.obj", &device, &queue, 1.0, Color::MAGENTA).await.unwrap(),
+            Model::load("cube.obj", &device, &queue, 0.5, Color::LIGHT_GRAY).await.unwrap(),
+            Model::load("cube.obj", &device, &queue, 0.5, Color::DARK_GRAY).await.unwrap(),
+            Model::load("knight.obj", &device, &queue, 0.8, Color::WHITE).await.unwrap(),
+            Model::load("knight.obj", &device, &queue, 0.8, Color::BLACK).await.unwrap(),
         ];
 
         let mut objects = (0..64)
@@ -365,6 +366,22 @@ impl<'a> State<'a> {
             );
             object.set_model(&mut models[(x+z) & 1]);
         }
+
+        objects.push(Object::new());
+        objects.last_mut().unwrap().set_model(&mut models[2]);
+        objects.last_mut().unwrap().transform.position = cgmath::Vector3::new(
+            2.5,
+            0.0,
+            0.5,
+        );
+
+        objects.push(Object::new());
+        objects.last_mut().unwrap().set_model(&mut models[3]);
+        objects.last_mut().unwrap().transform.position = cgmath::Vector3::new(
+            -2.5,
+            0.0,
+            -0.5,
+        );
 
 
         Self {
