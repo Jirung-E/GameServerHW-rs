@@ -63,3 +63,13 @@ impl Into<[f32; 4]> for Color {
     }
 }
 
+impl Into<wgpu::Color> for Color {
+    fn into(self) -> wgpu::Color {
+        wgpu::Color {
+            r: self.0 as f64,
+            g: self.1 as f64,
+            b: self.2 as f64,
+            a: self.3 as f64,
+        }
+    }
+}

@@ -1,9 +1,6 @@
 ### References
 - [Learn Wgpu](https://sotrh.github.io/learn-wgpu/)
 
-### TODO
-- [ ] 오브젝트에 모델 할당(모델은 인스턴싱됨)
-
 #### Study
 **Beginner**  
 [code](https://github.com/sotrh/learn-wgpu/tree/master/code/beginner)

@@ -57,8 +57,6 @@ impl Model {
     pub async fn load(
         file_name: &str,
         device: &wgpu::Device,
-        _queue: &wgpu::Queue,
-        // layout: &wgpu::BindGroupLayout,
         scale_factor: f32,
         base_color: Color,
     ) -> anyhow::Result<Model> {
