@@ -14,7 +14,6 @@ pub mod scene;
 use winit::{
     event::*,
     window::Window,
-    keyboard::{KeyCode, PhysicalKey},
 };
 use wgpu::util::DeviceExt;
 
@@ -140,7 +139,7 @@ impl<'a> State<'a> {
             source: wgpu::ShaderSource::Wgsl(include_str!("../shader.wgsl").into()),
         });
 
-        let mut camera_uniform = CameraUniform::new();
+        let camera_uniform = CameraUniform::new();
         // camera_uniform.update_view_proj(&camera);
 
         let camera_buffer = device.create_buffer_init(
