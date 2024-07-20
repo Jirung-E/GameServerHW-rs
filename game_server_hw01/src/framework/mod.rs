@@ -307,14 +307,14 @@ impl<'a> State<'a> {
     }
 
     pub fn update(&mut self) {
-        self.camera_uniform.update_view_proj(&self.scene.camera());
+        self.scene.update();
+
+        self.camera_uniform.update_view_proj(self.scene.view_proj());
         self.queue.write_buffer(
             &self.camera_buffer, 
             0, 
             bytemuck::cast_slice(&[self.camera_uniform])
         );
-
-        self.scene.update();
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {

@@ -5,7 +5,6 @@ pub use game_scene::GameScene;
 use super::{
     model::Model, 
     object::Object,
-    camera::Camera,
     color,
 };
 
@@ -17,7 +16,7 @@ pub trait Scene {
 
     fn update(&mut self);
 
-    fn camera(&self) -> &Camera;
+    fn view_proj(&self) -> cgmath::Matrix4<f32>;
     fn models(&self) -> &Vec<Model>;
     fn objects(&self) -> &Vec<Object>;
     fn background_color(&self) -> color::Color;

@@ -2,10 +2,9 @@ use winit::event::{
     ElementState, KeyEvent, WindowEvent
 };
 use winit::keyboard::{KeyCode, PhysicalKey};
-use cgmath::prelude::*;
 
 use super::super::{
-    camera::Camera,
+    camera::{Camera, CameraComponent, DefaultCamera},
     object::Object,
     model::Model,
     SCREEN_WIDTH, SCREEN_HEIGHT,
@@ -14,131 +13,51 @@ use super::Scene;
 use super::color::Color;
 
 
-
-
-struct CameraController {
-    speed: f32,
-    is_forward_pressed: bool,
-    is_backward_pressed: bool,
-    is_left_pressed: bool,
-    is_right_pressed: bool,
-}
-
-impl CameraController {
-    fn new(speed: f32) -> Self {
-        Self {
-            speed,
-            is_forward_pressed: false,
-            is_backward_pressed: false,
-            is_left_pressed: false,
-            is_right_pressed: false,
-        }
-    }
-
-    fn process_events(&mut self, event: &WindowEvent) -> bool {
-        match event {
-            WindowEvent::KeyboardInput {
-                event:
-                    KeyEvent {
-                        state,
-                        physical_key: PhysicalKey::Code(keycode),
-                        ..
-                    },
-                ..
-            } => {
-                let is_pressed = *state == ElementState::Pressed;
-                match keycode {
-                    KeyCode::ArrowUp => {
-                        self.is_forward_pressed = is_pressed;
-                        true
-                    }
-                    KeyCode::ArrowLeft => {
-                        self.is_left_pressed = is_pressed;
-                        true
-                    }
-                    KeyCode::ArrowDown => {
-                        self.is_backward_pressed = is_pressed;
-                        true
-                    }
-                    KeyCode::ArrowRight => {
-                        self.is_right_pressed = is_pressed;
-                        true
-                    }
-                    _ => false,
-                }
-            }
-            _ => false,
-        }
-    }
-
-    fn update_camera(&self, camera: &mut Camera) {
-        use cgmath::InnerSpace;
-        let forward = camera.target - camera.eye;
-        let forward_norm = forward.normalize();
-        let forward_mag = forward.magnitude();
-
-        // Prevents glitching when the camera gets too close to the
-        // center of the scene.
-        if self.is_forward_pressed && forward_mag > self.speed {
-            camera.eye += forward_norm * self.speed;
-        }
-        if self.is_backward_pressed {
-            camera.eye -= forward_norm * self.speed;
-        }
-
-        let right = forward_norm.cross(camera.up);
-
-        // Redo radius calc in case the forward/backward is pressed.
-        let forward = camera.target - camera.eye;
-        let forward_mag = forward.magnitude();
-
-        if self.is_right_pressed {
-            // Rescale the distance between the target and the eye so 
-            // that it doesn't change. The eye, therefore, still 
-            // lies on the circle made by the target and eye.
-            camera.eye = camera.target - (forward + right * self.speed).normalize() * forward_mag;
-        }
-        if self.is_left_pressed {
-            camera.eye = camera.target - (forward - right * self.speed).normalize() * forward_mag;
-        }
-    }
-}
-
-
-
-
 pub struct GameScene {
-    camera: Camera,
-    camera_controller: CameraController,
+    camera: DefaultCamera,
+    camera_offset: cgmath::Vector3<f32>,
+
+    background_color: Color,
 
     models: Vec<Model>,
     objects: Vec<Object>,
 
-    background_color: Color,
+    player: *mut Object,
 }
 
 impl GameScene {
-    const ROTATION_SPEED: f32 = 2.0 * std::f32::consts::PI / 60.0 / 100.0;
-
     pub fn new() -> Self {
-        let camera = Camera {
-            eye: (0.0, 1.0, 2.0).into(),
-            target: (0.0, 0.0, 0.0).into(),
-            up: cgmath::Vector3::unit_y(), 
+        let camera = DefaultCamera::from(CameraComponent {
+            eye: cgmath::Point3::new(0.0, 1.0, 2.0),
+            target: cgmath::Point3::new(0.0, 0.0, 0.0),
+            up: cgmath::Vector3::new(0.0, 1.0, 0.0),
             aspect: SCREEN_WIDTH as f32 / SCREEN_HEIGHT as f32,
             fovy: 60.0,
             znear: 0.1,
             zfar: 100.0,
-        };
+        });
 
         Self {
             camera,
-            camera_controller: CameraController::new(0.01),
+            camera_offset: cgmath::Vector3::new(0.0, 2.0, 4.0),
+
+            background_color: Color::BLACK,
 
             models: Vec::new(),
             objects: Vec::new(),
 
-            background_color: Color::BLACK,
+            player: std::ptr::null_mut(),
+        }
+    }
+
+    fn update_camera(&mut self) {
+        unsafe {
+            let p = (*self.player).transform.position;
+
+            let point = cgmath::Point3::new(p.x, p.y, p.z);
+
+            self.camera.component.target = point;
+            self.camera.component.eye = point + self.camera_offset;
         }
     }
 }
@@ -179,13 +98,11 @@ impl Scene for GameScene {
             0.1,
             2.0,
         );
+
+        self.player = self.objects.last_mut().unwrap();
     }
 
     fn handle_event(&mut self, event: &WindowEvent) -> bool {
-        if self.camera_controller.process_events(event) {
-            return true;
-        }
-
         match event {
             WindowEvent::KeyboardInput {
                 event:
@@ -222,18 +139,12 @@ impl Scene for GameScene {
     }
 
     fn update(&mut self) {
-        self.camera_controller.update_camera(&mut self.camera);
-
-        for object in self.objects[64..].iter_mut() {
-            object.transform.rotation = cgmath::Quaternion::from_angle_y(
-                cgmath::Rad(GameScene::ROTATION_SPEED)
-            ) * object.transform.rotation;
-        }
+        self.update_camera();
     }
 
 
-    fn camera(&self) -> &Camera {
-        &self.camera
+    fn view_proj(&self) -> cgmath::Matrix4<f32> {
+        self.camera.build_view_projection_matrix()
     }
 
     fn models(&self) -> &Vec<Model> {
