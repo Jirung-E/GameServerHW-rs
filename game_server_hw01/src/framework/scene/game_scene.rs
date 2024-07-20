@@ -50,15 +50,17 @@ impl GameScene {
         }
     }
 
+    fn player(&self) -> &mut Object {
+        unsafe { &mut *self.player }
+    }
+
     fn update_camera(&mut self) {
-        unsafe {
-            let p = (*self.player).transform.position;
+        let p = self.player().transform.position;
 
-            let point = cgmath::Point3::new(p.x, p.y, p.z);
+        let point = cgmath::Point3::new(p.x, p.y, p.z);
 
-            self.camera.component.target = point;
-            self.camera.component.eye = point + self.camera_offset;
-        }
+        self.camera.component.target = point;
+        self.camera.component.eye = point + self.camera_offset;
     }
 }
 
@@ -114,21 +116,31 @@ impl Scene for GameScene {
                     },
                 ..
             } => {
+                let player = self.player();
+
                 match keycode {
                     KeyCode::KeyW => {
-                        self.objects.last_mut().unwrap().transform.position.z -= 1.0;
+                        if player.transform.position.z > 0.0 {
+                            player.transform.position.z -= 1.0;
+                        }
                         true
                     }
                     KeyCode::KeyA => {
-                        self.objects.last_mut().unwrap().transform.position.x -= 1.0;
+                        if player.transform.position.x > 0.0 {
+                            player.transform.position.x -= 1.0;
+                        }
                         true
                     }
                     KeyCode::KeyS => {
-                        self.objects.last_mut().unwrap().transform.position.z += 1.0;
+                        if player.transform.position.z < 7.0 {
+                            player.transform.position.z += 1.0;
+                        }
                         true
                     }
                     KeyCode::KeyD => {
-                        self.objects.last_mut().unwrap().transform.position.x += 1.0;
+                        if player.transform.position.x < 7.0 {
+                            player.transform.position.x += 1.0;
+                        }
                         true
                     }
                     _ => false,
