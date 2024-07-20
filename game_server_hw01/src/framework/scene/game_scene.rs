@@ -94,14 +94,16 @@ impl Scene for GameScene {
         }
 
         self.objects.push(Object::new());
-        self.objects.last_mut().unwrap().set_model(&mut self.models[2]);
-        self.objects.last_mut().unwrap().transform.position = cgmath::Vector3::new(
+        
+        let p = self.objects.last_mut().unwrap();
+        p.set_model(&mut self.models[2]);
+        p.transform.position = cgmath::Vector3::new(
             3.0,
             0.1,
             2.0,
         );
 
-        self.player = self.objects.last_mut().unwrap();
+        self.player = p;
     }
 
     fn handle_event(&mut self, event: &WindowEvent) -> bool {

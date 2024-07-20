@@ -140,7 +140,6 @@ impl<'a> State<'a> {
         });
 
         let camera_uniform = CameraUniform::new();
-        // camera_uniform.update_view_proj(&camera);
 
         let camera_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
@@ -278,7 +277,6 @@ impl<'a> State<'a> {
 
             depth_texture,
 
-            // camera,
             camera_uniform,
             camera_buffer,
             camera_bind_group,
@@ -352,13 +350,12 @@ impl<'a> State<'a> {
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);    
-                
+            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
+            
             let instance_data = self.scene.models().iter()
                 .flat_map(|model| model.instances.iter())
                 .map(|instance| unsafe { (**instance).to_raw() })
                 .collect::<Vec<_>>();
-            // println!("{:?}", instance_data);
 
             self.instance_buffer = self.device.create_buffer_init(
                 &wgpu::util::BufferInitDescriptor {
