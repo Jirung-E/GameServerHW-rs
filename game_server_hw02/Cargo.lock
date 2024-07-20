@@ -1509,6 +1509,11 @@ dependencies = [
 [[package]]
 name = "server"
 version = "0.1.0"
+dependencies = [
+ "cgmath",
+ "futures",
+ "tokio",
+]
 
 [[package]]
 name = "signal-hook-registry"
