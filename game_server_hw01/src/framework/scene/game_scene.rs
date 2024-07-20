@@ -72,8 +72,8 @@ impl Scene for GameScene {
             self.models = vec![
                 Model::load("cube.obj", device, 0.5, Color::LIGHT_GRAY).await.unwrap(),
                 Model::load("cube.obj", device, 0.5, Color::DARK_GRAY).await.unwrap(),
-                Model::load("knight.obj", device, 0.8, Color::WHITE).await.unwrap(),
-                Model::load("knight.obj", device, 0.8, Color::BLACK).await.unwrap(),
+                Model::load("pawn.obj", device, 0.8, Color::WHITE).await.unwrap(),
+                Model::load("pawn.obj", device, 0.8, Color::BLACK).await.unwrap(),
             ];
         });
 
