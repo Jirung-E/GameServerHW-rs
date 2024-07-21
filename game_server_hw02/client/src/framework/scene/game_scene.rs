@@ -2,8 +2,15 @@ use winit::{
     event::{ElementState, KeyEvent, WindowEvent},
     keyboard::{KeyCode, PhysicalKey},
 };
-use futures::executor::block_on;
-use tokio::{io::AsyncWriteExt, net::TcpStream};
+use futures::{
+    future,
+    executor::block_on,
+};
+use tokio::{
+    select,
+    io::{AsyncWriteExt, AsyncReadExt},
+    net::TcpStream
+};
 
 use super::super::{
     camera::{Camera, CameraComponent, DefaultCamera},
@@ -97,9 +104,9 @@ impl GameScene {
         let p = self.objects.last_mut().unwrap();
         p.set_model(&mut self.models[2]);
         p.transform.position = cgmath::Vector3::new(
-            3.0,
-            0.1,
-            2.0,
+            0.0,
+            0.0,
+            0.0,
         );
 
         self.player = p;
@@ -118,22 +125,85 @@ impl GameScene {
         self.camera.component.eye = point + self.camera_offset;
     }
 
+    async fn pull_messages(&mut self) -> Option<String> {
+        let mut buf = [0; 1024];
+
+        select! {
+            read_result = self.stream.read(&mut buf) => {
+                match read_result {
+                    Ok(0) => {
+                        println!("Connection closed");
+                        None
+                    },
+                    Ok(n) => {
+                        let msg = String::from_utf8_lossy(&buf[..n]);
+                        println!("Received: {}", msg);
+                        Some(msg.to_string())
+                    },
+                    Err(e) => {
+                        eprintln!("Failed to read from socket; err = {:?}", e);
+                        None
+                    }
+                }
+            },
+            _ = future::ready(()) => None,
+        }
+    }
+
+    async fn process_messages(&mut self, msg: &str) {
+        let msg = msg.trim().split_whitespace().collect::<Vec<&str>>();
+
+        if msg.len() == 0 {
+            return;
+        }
+
+        match msg[0] {
+            "move" => {
+                if msg.len() != 3 {
+                    return;
+                }
+
+                let x = msg[1].parse::<i32>().unwrap_or(0);
+                let y = msg[2].parse::<i32>().unwrap_or(0);
+
+                let p = self.player();
+                p.transform.position.x += x as f32;
+                p.transform.position.z += y as f32;
+            },
+            "set" => {
+                if msg.len() != 3 {
+                    return;
+                }
+
+                let x = msg[1].parse::<i32>().unwrap_or(0);
+                let y = msg[2].parse::<i32>().unwrap_or(0);
+
+                let p = self.player();
+                p.transform.position.x = x as f32;
+                p.transform.position.z = y as f32;
+            },
+            _ => {}
+        }
+    }
+
     fn process_keyboard_input(&mut self, state: &ElementState, keycode: &KeyCode) -> bool {
         match state {
             ElementState::Pressed => {
                 let mut direction = (0, 0);
 
                 match keycode {
-                    KeyCode::KeyW => direction.1 = 1,
+                    KeyCode::KeyW => direction.1 = -1,
                     KeyCode::KeyA => direction.0 = -1,
-                    KeyCode::KeyS => direction.1 = -1,
+                    KeyCode::KeyS => direction.1 = 1,
                     KeyCode::KeyD => direction.0 = 1,
                     _ => return false,
                 }
 
                 block_on(async {
                     let msg = format!("move {} {}", direction.0, direction.1);
-                    self.stream.write_all(msg.as_bytes()).await.unwrap();
+                    println!("{}", self.stream.peer_addr().unwrap());
+                    self.stream.write_all(msg.as_bytes()).await
+                        .expect("Failed to write to stream");
                 });
 
                 true
@@ -165,6 +235,12 @@ impl Scene for GameScene {
     }
 
     fn update(&mut self) {
+        block_on(async {
+            while let Some(msg) = self.pull_messages().await {
+                self.process_messages(&msg).await;
+            }
+        });
+
         self.update_camera();
     }
 
