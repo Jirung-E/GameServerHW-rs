@@ -300,8 +300,8 @@ impl<'a> State<'a> {
         self.depth_texture = Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
     }
 
-    pub fn handle_event(&mut self, event: &WindowEvent) -> Option<&str> {
-        self.scene.handle_event(event)
+    pub fn handle_event(&mut self, event: &WindowEvent) -> bool {
+        self.scene.handle_event(event).is_some()
     }
 
     pub fn update(&mut self) {
