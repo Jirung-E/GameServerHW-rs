@@ -2,6 +2,7 @@ use winit::event::{
     ElementState, KeyEvent, WindowEvent
 };
 use winit::keyboard::{KeyCode, PhysicalKey};
+use futures::executor::block_on;
 
 use super::super::{
     camera::{Camera, CameraComponent, DefaultCamera},
@@ -66,8 +67,6 @@ impl GameScene {
 
 impl Scene for GameScene {
     fn init(&mut self, device: &wgpu::Device) {
-        use futures::executor::block_on;
-        
         block_on(async {
             self.models = vec![
                 Model::load("cube.obj", device, 0.5, Color::LIGHT_GRAY).await.unwrap(),
