@@ -7,10 +7,10 @@ use super::super::{
     camera::{Camera, CameraComponent, DefaultCamera},
     object::Object,
     model::Model,
+    color::Color,
     SCREEN_WIDTH, SCREEN_HEIGHT,
 };
 use super::Scene;
-use super::color::Color;
 
 
 pub struct GameScene {
@@ -26,7 +26,7 @@ pub struct GameScene {
 }
 
 impl GameScene {
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         let camera = DefaultCamera::from(CameraComponent {
             eye: cgmath::Point3::new(0.0, 1.0, 2.0),
             target: cgmath::Point3::new(0.0, 0.0, 0.0),
@@ -106,7 +106,7 @@ impl Scene for GameScene {
         self.player = p;
     }
 
-    fn handle_event(&mut self, event: &WindowEvent) -> bool {
+    fn handle_event(&mut self, event: &WindowEvent) -> Option<&str> {
         match event {
             WindowEvent::KeyboardInput {
                 event:
@@ -125,30 +125,30 @@ impl Scene for GameScene {
                         if player.transform.position.z > 0.0 {
                             player.transform.position.z -= 1.0;
                         }
-                        true
+                        Some("move up")
                     }
                     KeyCode::KeyA => {
                         if player.transform.position.x > 0.0 {
                             player.transform.position.x -= 1.0;
                         }
-                        true
+                        Some("move left")
                     }
                     KeyCode::KeyS => {
                         if player.transform.position.z < 7.0 {
                             player.transform.position.z += 1.0;
                         }
-                        true
+                        Some("move down")
                     }
                     KeyCode::KeyD => {
                         if player.transform.position.x < 7.0 {
                             player.transform.position.x += 1.0;
                         }
-                        true
+                        Some("move right")
                     }
-                    _ => false,
+                    _ => None,
                 }
             }
-            _ => false,
+            _ => None,
         }
     }
 

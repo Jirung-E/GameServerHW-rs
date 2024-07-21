@@ -12,7 +12,7 @@ use super::{
 pub trait Scene {
     fn init(&mut self, device: &wgpu::Device);
 
-    fn handle_event(&mut self, event: &winit::event::WindowEvent) -> bool;
+    fn handle_event(&mut self, event: &winit::event::WindowEvent) -> Option<&str>;
 
     fn update(&mut self);
 

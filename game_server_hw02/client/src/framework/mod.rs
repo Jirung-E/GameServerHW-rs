@@ -257,7 +257,7 @@ impl<'a> State<'a> {
             }
         );
 
-        let mut scene = GameScene::new();
+        let mut scene = Box::new(GameScene::new().await);
         scene.init(&device);
 
 
@@ -281,7 +281,7 @@ impl<'a> State<'a> {
             camera_buffer,
             camera_bind_group,
 
-            scene: Box::new(scene),
+            scene,
         }
     }
 
@@ -300,7 +300,7 @@ impl<'a> State<'a> {
         self.depth_texture = Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
     }
 
-    pub fn handle_event(&mut self, event: &WindowEvent) -> bool {
+    pub fn handle_event(&mut self, event: &WindowEvent) -> Option<&str> {
         self.scene.handle_event(event)
     }
 
