@@ -1,7 +1,7 @@
-use winit::event::{
-    ElementState, KeyEvent, WindowEvent
+use winit::{
+    event::{ElementState, KeyEvent, WindowEvent},
+    keyboard::{KeyCode, PhysicalKey},
 };
-use winit::keyboard::{KeyCode, PhysicalKey};
 use futures::executor::block_on;
 
 use super::super::{
