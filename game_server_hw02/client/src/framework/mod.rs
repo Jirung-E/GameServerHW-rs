@@ -301,7 +301,7 @@ impl<'a> State<'a> {
     }
 
     pub fn handle_event(&mut self, event: &WindowEvent) -> bool {
-        self.scene.handle_event(event).is_some()
+        self.scene.handle_event(event)
     }
 
     pub fn update(&mut self) {
