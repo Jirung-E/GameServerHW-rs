@@ -8,6 +8,8 @@ use super::{
     color,
 };
 
+use std::iter::IntoIterator;
+
 
 pub trait Scene {
     fn init(&mut self, device: &wgpu::Device);
@@ -17,7 +19,8 @@ pub trait Scene {
     fn update(&mut self);
 
     fn view_proj(&self) -> cgmath::Matrix4<f32>;
-    fn models(&self) -> &Vec<Model>;
-    fn objects(&self) -> &Vec<Object>;
     fn background_color(&self) -> color::Color;
+
+    fn models(&self) -> impl IntoIterator<Item = &Model>;
+    fn objects(&self) -> impl IntoIterator<Item = &Object>;
 }

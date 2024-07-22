@@ -5,8 +5,10 @@ use winit::{
 use cgmath::{Vector2, Vector3, Point3};
 use futures::executor::block_on;
 use std::{
+    io::{Read, Write}, 
     net::TcpStream,
-    io::{Read, Write},
+    collections::HashMap,
+    iter::IntoIterator,
 };
 
 use super::super::{
@@ -27,8 +29,9 @@ pub struct GameScene {
 
     models: Vec<Model>,
     objects: Vec<Object>,
+    objects_from_server: HashMap<u32, Object>,
 
-    player: *mut Object,
+    player_id: u32,
 
     // ip: String,
     // port: u16,
@@ -62,8 +65,9 @@ impl GameScene {
 
             models: Vec::new(),
             objects: Vec::new(),
+            objects_from_server: HashMap::new(),
 
-            player: std::ptr::null_mut(),
+            player_id: 0,
 
             // ip,
             // port,
@@ -91,38 +95,28 @@ impl GameScene {
         for (i, object) in self.objects.iter_mut().enumerate() {
             let x = i % 8;
             let z = i / 8;
+            object.set_model(&mut self.models[(x+z) & 1]);
             object.transform.position = Vector3::new(
                 x as f32,
                 -0.5,
                 z as f32
             );
-            object.set_model(&mut self.models[(x+z) & 1]);
         }
-
-        self.objects.push(Object::new());
-        
-        let p = self.objects.last_mut().unwrap();
-        p.set_model(&mut self.models[2]);
-        p.transform.position = Vector3::new(
-            0.0,
-            0.0,
-            0.0,
-        );
-
-        self.player = p;
     }
 
-    fn player(&self) -> &mut Object {
-        unsafe { &mut *self.player }
+    fn player(&self) -> Option<&Object> {
+        self.objects_from_server.get(&self.player_id)
     }
 
     fn update_camera(&mut self) {
-        let p = self.player().transform.position;
-
-        let point = Point3::new(p.x, p.y, p.z);
-
-        self.camera.component.target = point;
-        self.camera.component.eye = point + self.camera_offset;
+        if let Some(player) = self.player(){
+            let p = player.transform.position;
+    
+            let point = Point3::new(p.x, p.y, p.z);
+    
+            self.camera.component.target = point;
+            self.camera.component.eye = point + self.camera_offset;
+        }
     }
 
     fn pull_messages(&mut self) -> Option<String> {
@@ -159,6 +153,16 @@ impl GameScene {
         }
     }
 
+    fn process_messages(&mut self, msg: &str) {
+        let messages = msg.trim().split("\n").collect::<Vec<&str>>();
+
+        println!("messages: {:?}", messages);
+
+        for msg in messages {
+            self.process_message(msg);
+        }
+    }
+    
     fn process_message(&mut self, msg: &str) {
         let msg = msg.trim().split_whitespace()
             .map(|s| s.trim())
@@ -170,44 +174,53 @@ impl GameScene {
             return;
         }
 
-        match msg[0] {
-            "move" => {
-                if msg.len() != 3 {
-                    return;
-                }
-
-                let x = msg[1].parse::<i32>().unwrap_or(0);
-                let y = msg[2].parse::<i32>().unwrap_or(0);
-
-                let p = self.player();
-                p.transform.position.x += x as f32;
-                p.transform.position.z += y as f32;
-            },
-            "set" => {
-                if msg.len() != 3 {
-                    return;
-                }
-
-                let x = msg[1].parse::<i32>().unwrap_or(0);
-                let y = msg[2].parse::<i32>().unwrap_or(0);
-
-                let p = self.player();
-                p.transform.position.x = x as f32;
-                p.transform.position.z = y as f32;
-
-                println!("set ok");
-            },
-            _ => {}
+        if msg[0] != "GAMESERVER" {
+            return;
         }
-    }
 
-    fn process_messages(&mut self, msg: &str) {
-        let messages = msg.trim().split("\n").collect::<Vec<&str>>();
+        let msg = &msg[1..];
 
-        println!("messages: {:?}", messages);
+        match msg[0] {
+            "update" => {
+                if msg.len() < 2 {
+                    return;
+                }
 
-        for msg in messages {
-            self.process_message(msg);
+                let num_objects = msg[1].parse::<usize>().unwrap();
+
+                for i in 0..num_objects {
+                    let idx = 2 + i * 3;
+                    let id = msg[idx].parse::<u32>().unwrap();
+                    let x = msg[idx+1].parse::<i32>().unwrap();
+                    let z = msg[idx+2].parse::<i32>().unwrap();
+
+                    // 기존에 없던 id면 
+                    // 1. objects_from_server에 추가
+                    // 2. model 설정
+                    
+                    let object = self.objects_from_server.entry(id)
+                        .or_insert_with(|| {
+                            Object::new()
+                        });
+
+                    object.transform.position.x = x as f32;
+                    object.transform.position.z = z as f32;
+
+                    if id == self.player_id {
+                        object.set_model(&mut self.models[2]);
+                    } else {
+                        object.set_model(&mut self.models[3]);
+                    }
+                }
+
+                // 기존에 있던 id가 안보이면 삭제(TODO - model에서 instance제거해야함)
+
+                println!("{}", self.models[2].instances.len()); 
+                unsafe {
+                    println!("{:?}", (*self.models[2].instances[0]).position);
+                }
+            }
+            _ => {}
         }
     }
 
@@ -227,7 +240,7 @@ impl GameScene {
                 println!("Move ({} {})", direction.x, direction.y);
 
                 // println!("{}", self.stream.peer_addr().unwrap());
-                let msg = format!("move {} {}\n", direction.x, direction.y);
+                let msg = format!("move {} {} {}\n", self.player_id, direction.x, direction.y);
                 self.stream.write_all(msg.as_bytes())
                     .expect("Failed to write to stream");
 
@@ -262,6 +275,9 @@ impl Scene for GameScene {
     }
 
     fn update(&mut self) {
+        self.stream.write_all(b"update\n")
+            .expect("Failed to write to stream");
+
         while let Some(msg) = self.pull_messages() {
             self.process_messages(&msg);
         }
@@ -274,15 +290,16 @@ impl Scene for GameScene {
         self.camera.build_view_projection_matrix()
     }
 
-    fn models(&self) -> &Vec<Model> {
-        &self.models
-    }
-
-    fn objects(&self) -> &Vec<Object> {
-        &self.objects
-    }
-
     fn background_color(&self) -> Color {
         self.background_color
+    }
+    
+
+    fn models(&self) -> impl IntoIterator<Item = &Model> {
+        self.models.iter()
+    }
+
+    fn objects(&self) -> impl IntoIterator<Item = &Object> {
+        self.objects.iter().chain(self.objects_from_server.values())
     }
 }

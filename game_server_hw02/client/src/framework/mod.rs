@@ -50,7 +50,7 @@ pub struct State<'a> {
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
 
-    scene: Box<dyn Scene>,
+    scene: GameScene,
 }
 
 
@@ -257,7 +257,7 @@ impl<'a> State<'a> {
             }
         );
 
-        let mut scene = Box::new(GameScene::new().await);
+        let mut scene = GameScene::new().await;
         scene.init(&device);
 
 
@@ -352,7 +352,7 @@ impl<'a> State<'a> {
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
             
-            let instance_data = self.scene.models().iter()
+            let instance_data = self.scene.models().into_iter()
                 .flat_map(|model| model.instances.iter())
                 .map(|instance| unsafe { (**instance).to_raw() })
                 .collect::<Vec<_>>();
@@ -368,7 +368,7 @@ impl<'a> State<'a> {
             render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
             
             let mut offset = 0;
-            for model in self.scene.models().iter() {
+            for model in self.scene.models() {
                 render_pass.draw_mesh_instanced(&model.meshes[0], offset..offset + model.instances.len() as u32);
                 offset += model.instances.len() as u32;
             }
