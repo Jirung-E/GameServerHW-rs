@@ -160,7 +160,9 @@ impl GameScene {
     }
 
     fn process_message(&mut self, msg: &str) {
-        let msg = msg.trim().split_whitespace().collect::<Vec<&str>>();
+        let msg = msg.trim().split_whitespace()
+            .map(|s| s.trim())
+            .collect::<Vec<&str>>();
 
         println!("Received: {:?}", msg);
 
