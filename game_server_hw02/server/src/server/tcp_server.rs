@@ -1,6 +1,4 @@
-use futures::future;
 use tokio::{
-    select,
     net::{TcpListener, TcpStream},
     io::{AsyncReadExt, AsyncWriteExt},
 };
@@ -21,82 +19,66 @@ pub async fn run_server(ip: &str, port: u16) {
 
     println!("Tcp server - listening on: {}", addr);
 
-    // 게임 플레이 중에는 참가/퇴장의 빈도가 높지 않을것이므로 LinkedList 대신 Vec 사용
-    let mut streams: Vec<TcpStream> = Vec::new();
-
     loop {
-        if streams.len() == 0 {
-            println!("Waiting for connection...");
-            if let Ok((mut stream, addr)) = tcp_listener.accept().await {
+        println!("Waiting for connection...");
+        match tcp_listener.accept().await {
+            Ok((stream, addr)) => {
                 println!("Accepted connection from: {}", addr);
-                let response = format!("set {} {}\n", unsafe { PLAYER.x }, unsafe { PLAYER.y });
-                stream.write_all(response.as_bytes()).await
-                    .expect("Failed to write to stream");
-                streams.push(stream);
+                tokio::spawn(handle_connection(stream));
+            },
+            Err(e) => {
+                eprintln!("Failed to accept connection; err = {:?}", e);
             }
-        }
-        else {
-            select! {
-                accept_result = tcp_listener.accept() => {
-                    if let Ok((mut stream, addr)) = accept_result {
-                        println!("Accepted connection from: {}", addr);
-                        let response = format!("set {} {}\n", unsafe { PLAYER.x }, unsafe { PLAYER.y });
-                        stream.write_all(response.as_bytes()).await
-                            .expect("Failed to write to stream");
-                        streams.push(stream);
-                    }
-                }
-                _ = future::ready(()) => {}
-            }
-        }
-        
-        let mut buf = [0; 1024];
-
-        let mut invalid_indices: Vec<usize> = Vec::new();
-        
-        for (i, stream) in streams.iter_mut().enumerate() {
-            let read_result = stream.read(&mut buf).await;
-            match read_result {
-                Ok(0) => {
-                    println!("Connection closed");
-                    invalid_indices.push(i);
-                },
-                Ok(n) => {
-                    let msg = String::from_utf8_lossy(&buf[..n]);
-                    handle_message(stream, &msg).await;
-                },
-                Err(e) => {
-                    eprintln!("Failed to read from socket; err = {:?}", e);
-                    invalid_indices.push(i);
-                }
-            }
-        }
-
-        for i in invalid_indices.iter().rev() {
-            streams.swap_remove(*i);
         }
     }
 }
 
-async fn handle_message(stream: &mut TcpStream, msg: &str) {
+async fn handle_connection(mut stream: TcpStream) {
+    {
+        let init_msg = format!("set {} {}\n", unsafe { PLAYER.x }, unsafe { PLAYER.y });
+        stream.write_all(init_msg.as_bytes()).await
+            .expect("Failed to write to socket");
+    }
+
+    let mut buf = [0; 1024];
+    
+    loop {
+        match stream.read(&mut buf).await {
+            Ok(0) => {
+                println!("Connection closed");
+                return;
+            },
+            Ok(n) => {
+                let msg = String::from_utf8_lossy(&buf[..n]);
+                if let Some(response) = handle_message(&msg).await {
+                    stream.write_all(response.as_bytes()).await
+                        .expect("Failed to write to socket");
+                }
+            },
+            Err(e) => {
+                eprintln!("Failed to read from socket; err = {:?}", e);
+            }
+        }
+    }
+}
+
+async fn handle_message(msg: &str) -> Option<String> {
     println!("Received message: {}", msg);
 
     let msg = msg.trim().split_whitespace().collect::<Vec<&str>>();
 
     if msg.len() == 0 {
-        return;
+        return None;
     }
 
     match msg[0] {
         "ping" => {
-            let response = "pong\n";
-            stream.write_all(response.as_bytes()).await
-                .expect("Failed to write to stream");
+            Some("pong\n".to_string())
         },
 
         "move" => {
             if msg.len() != 3 {
-                return;
+                return None;
             }
 
             let x = msg[1].parse::<i32>().unwrap_or(0);
@@ -122,11 +104,9 @@ async fn handle_message(stream: &mut TcpStream, msg: &str) {
                 }
             }
 
-            let response = format!("set {} {}\n", unsafe { PLAYER.x }, unsafe { PLAYER.y });
-            stream.write_all(response.as_bytes()).await
-                .expect("Failed to write to stream");
+            Some(format!("set {} {}\n", unsafe { PLAYER.x }, unsafe { PLAYER.y }))
         },
 
-        _ => {}
+        _ => None
     }
 }
