@@ -2,14 +2,11 @@ use winit::{
     event::{ElementState, KeyEvent, WindowEvent},
     keyboard::{KeyCode, PhysicalKey},
 };
-use futures::{
-    future,
-    executor::block_on,
-};
-use tokio::{
-    select,
-    io::{AsyncWriteExt, AsyncReadExt},
-    net::TcpStream
+use cgmath::{Vector2, Vector3, Point3};
+use futures::executor::block_on;
+use std::{
+    net::TcpStream,
+    io::{Read, Write},
 };
 
 use super::super::{
@@ -24,7 +21,7 @@ use super::Scene;
 
 pub struct GameScene {
     camera: DefaultCamera,
-    camera_offset: cgmath::Vector3<f32>,
+    camera_offset: Vector3<f32>,
 
     background_color: Color,
 
@@ -41,9 +38,9 @@ pub struct GameScene {
 impl GameScene {
     pub async fn new() -> Self {
         let camera = DefaultCamera::from(CameraComponent {
-            eye: cgmath::Point3::new(0.0, 1.0, 2.0),
-            target: cgmath::Point3::new(0.0, 0.0, 0.0),
-            up: cgmath::Vector3::new(0.0, 1.0, 0.0),
+            eye: Point3::new(0.0, 1.0, 2.0),
+            target: Point3::new(0.0, 0.0, 0.0),
+            up: Vector3::new(0.0, 1.0, 0.0),
             aspect: SCREEN_WIDTH as f32 / SCREEN_HEIGHT as f32,
             fovy: 60.0,
             znear: 0.1,
@@ -53,11 +50,12 @@ impl GameScene {
         let ip = "127.0.0.1".to_string();
         let port = 8080;
         let addr = format!("{}:{}", ip, port);
-        let stream = TcpStream::connect(addr).await.unwrap();
+        let stream = TcpStream::connect(addr).unwrap();
+        stream.set_nonblocking(true).unwrap();
 
         Self {
             camera,
-            camera_offset: cgmath::Vector3::new(0.0, 2.0, 4.0),
+            camera_offset: Vector3::new(0.0, 2.0, 4.0),
 
             background_color: Color::BLACK,
 
@@ -91,7 +89,7 @@ impl GameScene {
         for (i, object) in self.objects.iter_mut().enumerate() {
             let x = i % 8;
             let z = i / 8;
-            object.transform.position = cgmath::Vector3::new(
+            object.transform.position = Vector3::new(
                 x as f32,
                 -0.5,
                 z as f32
@@ -103,7 +101,7 @@ impl GameScene {
         
         let p = self.objects.last_mut().unwrap();
         p.set_model(&mut self.models[2]);
-        p.transform.position = cgmath::Vector3::new(
+        p.transform.position = Vector3::new(
             0.0,
             0.0,
             0.0,
@@ -119,39 +117,40 @@ impl GameScene {
     fn update_camera(&mut self) {
         let p = self.player().transform.position;
 
-        let point = cgmath::Point3::new(p.x, p.y, p.z);
+        let point = Point3::new(p.x, p.y, p.z);
 
         self.camera.component.target = point;
         self.camera.component.eye = point + self.camera_offset;
     }
 
-    async fn pull_messages(&mut self) -> Option<String> {
+    fn pull_messages(&mut self) -> Option<String> {
         let mut buf = [0; 1024];
 
-        select! {
-            read_result = self.stream.read(&mut buf) => {
-                match read_result {
-                    Ok(0) => {
-                        println!("Connection closed");
-                        None
-                    },
-                    Ok(n) => {
-                        let msg = String::from_utf8_lossy(&buf[..n]);
-                        println!("Received: {}", msg);
-                        Some(msg.to_string())
-                    },
-                    Err(e) => {
-                        eprintln!("Failed to read from socket; err = {:?}", e);
-                        None
-                    }
-                }
+        match self.stream.read(&mut buf) {
+            Ok(0) => {
+                println!("Connection closed");
+                None
             },
-            _ = future::ready(()) => None,
+            Ok(n) => {
+                let msg = String::from_utf8_lossy(&buf[..n]);
+                // println!("Received: {}", msg);
+                Some(msg.to_string())
+            },
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                // println!("Would block");
+                None
+            },
+            Err(e) => {
+                eprintln!("Failed to read from socket; err = {:?}", e);
+                None
+            }
         }
     }
 
-    async fn process_messages(&mut self, msg: &str) {
+    fn process_message(&mut self, msg: &str) {
         let msg = msg.trim().split_whitespace().collect::<Vec<&str>>();
+
+        println!("Received: {:?}", msg);
 
         if msg.len() == 0 {
             return;
@@ -181,34 +180,48 @@ impl GameScene {
                 let p = self.player();
                 p.transform.position.x = x as f32;
                 p.transform.position.z = y as f32;
+
+                println!("set ok");
             },
             _ => {}
+        }
+    }
+
+    fn process_messages(&mut self, msg: &str) {
+        let messages = msg.trim().split("\n").collect::<Vec<&str>>();
+
+        println!("messages: {:?}", messages);
+
+        for msg in messages {
+            self.process_message(msg);
         }
     }
 
     fn process_keyboard_input(&mut self, state: &ElementState, keycode: &KeyCode) -> bool {
         match state {
             ElementState::Pressed => {
-                let mut direction = (0, 0);
+                let mut direction = Vector2::new(0, 0);
 
                 match keycode {
-                    KeyCode::KeyW => direction.1 = -1,
-                    KeyCode::KeyA => direction.0 = -1,
-                    KeyCode::KeyS => direction.1 = 1,
-                    KeyCode::KeyD => direction.0 = 1,
+                    KeyCode::KeyW => direction.y = -1,
+                    KeyCode::KeyA => direction.x = -1,
+                    KeyCode::KeyS => direction.y = 1,
+                    KeyCode::KeyD => direction.x = 1,
                     _ => return false,
                 }
+                
+                println!("Move ({} {})", direction.x, direction.y);
 
-                block_on(async {
-                    let msg = format!("move {} {}", direction.0, direction.1);
-                    println!("{}", self.stream.peer_addr().unwrap());
-                    self.stream.write_all(msg.as_bytes()).await
-                        .expect("Failed to write to stream");
-                });
+                // println!("{}", self.stream.peer_addr().unwrap());
+                let msg = format!("move {} {}\n", direction.x, direction.y);
+                self.stream.write_all(msg.as_bytes())
+                    .expect("Failed to write to stream");
+
+                println!("Sent ok");
 
                 true
             }
-            ElementState::Released => false,
+            ElementState::Released => false
         }
     }
 }
@@ -235,11 +248,9 @@ impl Scene for GameScene {
     }
 
     fn update(&mut self) {
-        block_on(async {
-            while let Some(msg) = self.pull_messages().await {
-                self.process_messages(&msg).await;
-            }
-        });
+        while let Some(msg) = self.pull_messages() {
+            self.process_messages(&msg);
+        }
 
         self.update_camera();
     }

@@ -29,7 +29,7 @@ pub async fn run_server(ip: &str, port: u16) {
             println!("Waiting for connection...");
             if let Ok((mut stream, addr)) = tcp_listener.accept().await {
                 println!("Accepted connection from: {}", addr);
-                let response = format!("set {} {}", unsafe { PLAYER.x }, unsafe { PLAYER.y });
+                let response = format!("set {} {}\n", unsafe { PLAYER.x }, unsafe { PLAYER.y });
                 stream.write_all(response.as_bytes()).await
                     .expect("Failed to write to stream");
                 streams.push(stream);
@@ -40,7 +40,7 @@ pub async fn run_server(ip: &str, port: u16) {
                 accept_result = tcp_listener.accept() => {
                     if let Ok((mut stream, addr)) = accept_result {
                         println!("Accepted connection from: {}", addr);
-                        let response = format!("set {} {}", unsafe { PLAYER.x }, unsafe { PLAYER.y });
+                        let response = format!("set {} {}\n", unsafe { PLAYER.x }, unsafe { PLAYER.y });
                         stream.write_all(response.as_bytes()).await
                             .expect("Failed to write to stream");
                         streams.push(stream);
@@ -89,7 +89,7 @@ async fn handle_message(stream: &mut TcpStream, msg: &str) {
 
     match msg[0] {
         "ping" => {
-            let response = "pong";
+            let response = "pong\n";
             stream.write_all(response.as_bytes()).await
                 .expect("Failed to write to stream");
         },
@@ -122,7 +122,7 @@ async fn handle_message(stream: &mut TcpStream, msg: &str) {
                 }
             }
 
-            let response = format!("set {} {}", unsafe { PLAYER.x }, unsafe { PLAYER.y });
+            let response = format!("set {} {}\n", unsafe { PLAYER.x }, unsafe { PLAYER.y });
             stream.write_all(response.as_bytes()).await
                 .expect("Failed to write to stream");
         },
