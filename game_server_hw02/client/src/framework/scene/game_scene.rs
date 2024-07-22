@@ -32,6 +32,7 @@ pub struct GameScene {
 
     // ip: String,
     // port: u16,
+    addr: String,
     stream: TcpStream,
 }
 
@@ -50,7 +51,7 @@ impl GameScene {
         let ip = "127.0.0.1".to_string();
         let port = 8080;
         let addr = format!("{}:{}", ip, port);
-        let stream = TcpStream::connect(addr).unwrap();
+        let stream = TcpStream::connect(addr.clone()).unwrap();
         stream.set_nonblocking(true).unwrap();
 
         Self {
@@ -66,6 +67,7 @@ impl GameScene {
 
             // ip,
             // port,
+            addr,
             stream,
         }
     }
@@ -142,7 +144,17 @@ impl GameScene {
             },
             Err(e) => {
                 eprintln!("Failed to read from socket; err = {:?}", e);
-                None
+                match TcpStream::connect(self.addr.clone()) {
+                    Ok(stream) => {
+                        self.stream = stream;
+                        self.stream.set_nonblocking(true).unwrap();
+                        self.pull_messages()
+                    },
+                    Err(e) => {
+                        eprintln!("Failed to reconnect; err = {:?}", e);
+                        None
+                    }
+                }
             }
         }
     }
