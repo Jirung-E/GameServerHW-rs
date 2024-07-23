@@ -3,7 +3,7 @@ use local_ip_address::local_ip;
 
 
 pub fn get_addr() -> Result<(String, u16), String> {
-    let help_message = "Usage: .exe <mode>:<port>";
+    let help_message = "Usage: .exe <mode(or ip)>:<port>";
     let public_ip = local_ip().unwrap().to_string();
     let mode_list = format!("mode: \n  - localhost\n  - public: \t{}\n", public_ip);
 
@@ -23,11 +23,8 @@ pub fn get_addr() -> Result<(String, u16), String> {
         .parse::<u16>().unwrap();
 
     let ip = match ip {
-        "localhost" => ip,
         "public" => &public_ip,
-        _ => {
-            return Err(help_message);
-        }
+        _ => ip
     };
 
     Ok((ip.to_string(), port))
