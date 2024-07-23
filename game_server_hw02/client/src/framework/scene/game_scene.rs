@@ -156,7 +156,7 @@ impl GameScene {
     fn process_messages(&mut self, msg: &str) {
         let messages = msg.trim().split("\n").collect::<Vec<&str>>();
 
-        println!("messages: {:?}", messages);
+        // println!("messages: {:?}", messages);
 
         for msg in messages {
             self.process_message(msg);
@@ -168,7 +168,7 @@ impl GameScene {
             .map(|s| s.trim())
             .collect::<Vec<&str>>();
 
-        println!("Received: {:?}", msg);
+        // println!("Received: {:?}", msg);
 
         if msg.len() == 0 {
             return;
@@ -187,6 +187,7 @@ impl GameScene {
                 }
 
                 let num_objects = msg[1].parse::<usize>().unwrap();
+                let mut valid_ids: Vec<u32> = Vec::new();
 
                 for i in 0..num_objects {
                     let idx = 2 + i * 3;
@@ -194,31 +195,35 @@ impl GameScene {
                     let x = msg[idx+1].parse::<i32>().unwrap();
                     let z = msg[idx+2].parse::<i32>().unwrap();
 
-                    // 기존에 없던 id면 
-                    // 1. objects_from_server에 추가
-                    // 2. model 설정
-                    
-                    let object = self.objects_from_server.entry(id)
-                        .or_insert_with(|| {
-                            Object::new()
-                        });
+                    let object = if let Some(object) = self.objects_from_server.get_mut(&id) {
+                        object
+                    }
+                    else {
+                        self.objects_from_server.insert(id, Object::new());
+                        let object = self.objects_from_server.get_mut(&id).unwrap();
+                        
+                        if id == self.player_id {
+                            object.set_model(&mut self.models[2]);
+                        } else {
+                            object.set_model(&mut self.models[3]);
+                        }
+
+                        object
+                    };
 
                     object.transform.position.x = x as f32;
                     object.transform.position.z = z as f32;
-
-                    if id == self.player_id {
-                        object.set_model(&mut self.models[2]);
-                    } else {
-                        object.set_model(&mut self.models[3]);
-                    }
+                    
+                    valid_ids.push(id);
                 }
 
-                // 기존에 있던 id가 안보이면 삭제(TODO - model에서 instance제거해야함)
+                // 기존에 있던 id가 안보이면 삭제
+                self.objects_from_server.retain(|k, _| valid_ids.contains(k));
 
                 println!("{}", self.models[2].instances.len()); 
-                unsafe {
-                    println!("{:?}", (*self.models[2].instances[0]).position);
-                }
+                // unsafe {
+                //     println!("{:?}", (*self.models[2].instances[0]).position);
+                // }
             }
             _ => {}
         }
