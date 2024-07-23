@@ -10,6 +10,7 @@ use std::{
     collections::HashMap,
     iter::IntoIterator,
 };
+use get_addr::get_addr;
 
 use super::super::{
     camera::{Camera, CameraComponent, DefaultCamera},
@@ -51,8 +52,14 @@ impl GameScene {
             zfar: 100.0,
         });
 
-        let ip = "127.0.0.1".to_string();
-        let port = 8080;
+        let (ip, port) = match get_addr() {
+            Ok((ip, port)) => (ip, port),
+            Err(e) => {
+                panic!("{}", e);
+            }
+        };
+        // let ip = "127.0.0.1".to_string();
+        // let port = 8080;
         let addr = format!("{}:{}", ip, port);
         let stream = TcpStream::connect(addr.clone()).unwrap();
         stream.set_nonblocking(true).unwrap();

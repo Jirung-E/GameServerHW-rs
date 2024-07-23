@@ -379,6 +379,7 @@ dependencies = [
  "env_logger",
  "fs_extra",
  "futures",
+ "get_addr",
  "glob",
  "lockfree",
  "log",
@@ -712,6 +713,13 @@ dependencies = [
  "pin-project-lite",
  "pin-utils",
  "slab",
+]
+
+[[package]]
+name = "get_addr"
+version = "0.1.0"
+dependencies = [
+ "local-ip-address",
 ]
 
 [[package]]
@@ -1577,7 +1585,7 @@ version = "0.1.0"
 dependencies = [
  "cgmath",
  "futures",
- "local-ip-address",
+ "get_addr",
  "tokio",
 ]
 
