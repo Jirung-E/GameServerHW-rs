@@ -49,30 +49,43 @@ async fn handle_connection(mut stream: TcpStream) {
     send_message(&mut stream, &update_message()).await;
     
     loop {
-        let response = match stream.read(&mut buf).await {
+        let read = stream.read(&mut buf).await;
+        
+        // print!("{} - ", stream.peer_addr().unwrap());
+        // use std::io::Write;
+        // std::io::stdout().flush().unwrap();
+
+        match read {
             Ok(0) => {
                 println!("Connection closed");
                 return;
             },
+
             Ok(n) => {
                 let msg = String::from_utf8_lossy(&buf[..n]);
-                process_message(&msg).await
+                // println!("Received: {}", msg);
+                process_messages(&mut stream, &msg).await;
             },
+
             Err(e) => {
                 eprintln!("Failed to read from socket; err = {:?}", e);
                 return;
-            }
+            },
         };
+    }
+}
 
-        if let Some(response) = response {
-            send_message(&mut stream, &response).await;
+async fn process_messages(stream: &mut TcpStream, msg: &str) {
+    let messages = msg.trim().split("\n").collect::<Vec<&str>>();
+
+    for msg in messages {
+        if let Some(response) = process_message(msg) {
+            send_message(stream, &response).await;
         }
     }
 }
 
-async fn process_message(msg: &str) -> Option<String> {
-    println!("Received message: {}", msg);
-
+fn process_message(msg: &str) -> Option<String> {
     let msg = msg.trim().split_whitespace().collect::<Vec<&str>>();
 
     if msg.len() == 0 {
@@ -80,47 +93,43 @@ async fn process_message(msg: &str) -> Option<String> {
     }
 
     match msg[0] {
-        "ping" => {
-            Some("pong".to_string())
-        },
+        "ping" => Some("pong".to_string()),
 
-        "move" => {
-            if msg.len() != 4 {
-                return None;
-            }
-
+        "move" if msg.len() == 4 => {
             let id = msg[1].parse::<u32>().unwrap();
             let x = msg[2].parse::<i32>().unwrap();
             let y = msg[3].parse::<i32>().unwrap();
 
-            println!("Move {}: ({}, {})", id, x, y);
-
-            unsafe {
-                PLAYER.x += x;
-                PLAYER.y += y;
-
-                if PLAYER.x < 0 {
-                    PLAYER.x = 0;
-                }
-                if PLAYER.y < 0 {
-                    PLAYER.y = 0;
-                }
-                if PLAYER.x > 7 {
-                    PLAYER.x = 7;
-                }
-                if PLAYER.y > 7 {
-                    PLAYER.y = 7;
-                }
-            }
+            move_player(id, x, y);
 
             None
         },
 
-        "update" => {
-            Some(update_message())
-        }
+        "update" => Some(update_message()),
 
         _ => None
+    }
+}
+
+fn move_player(id: u32, x: i32, y: i32) {
+    println!("Move {}: ({}, {})", id, x, y);
+
+    unsafe {
+        PLAYER.x += x;
+        PLAYER.y += y;
+
+        if PLAYER.x < 0 {
+            PLAYER.x = 0;
+        }
+        if PLAYER.y < 0 {
+            PLAYER.y = 0;
+        }
+        if PLAYER.x > 7 {
+            PLAYER.x = 7;
+        }
+        if PLAYER.y > 7 {
+            PLAYER.y = 7;
+        }
     }
 }
 
