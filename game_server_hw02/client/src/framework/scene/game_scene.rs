@@ -204,7 +204,8 @@ impl GameScene {
                         
                         if id == self.player_id {
                             object.set_model(&mut self.models[2]);
-                        } else {
+                        } 
+                        else {
                             object.set_model(&mut self.models[3]);
                         }
 
@@ -219,11 +220,6 @@ impl GameScene {
 
                 // 기존에 있던 id가 안보이면 삭제
                 self.objects_from_server.retain(|k, _| valid_ids.contains(k));
-
-                println!("{}", self.models[2].instances.len()); 
-                // unsafe {
-                //     println!("{:?}", (*self.models[2].instances[0]).position);
-                // }
             }
             _ => {}
         }
