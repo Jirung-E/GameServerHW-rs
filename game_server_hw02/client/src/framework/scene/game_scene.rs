@@ -61,7 +61,7 @@ impl GameScene {
             camera,
             camera_offset: Vector3::new(0.0, 2.0, 4.0),
 
-            background_color: Color::BLACK,
+            background_color: Color::from_rgb(0.1, 0.3, 0.5),
 
             models: Vec::new(),
             objects: Vec::new(),
@@ -181,6 +181,14 @@ impl GameScene {
         let msg = &msg[1..];
 
         match msg[0] {
+            "init" => {
+                if msg.len() < 2 {
+                    return;
+                }
+
+                self.player_id = msg[1].parse::<u32>().unwrap();
+            }
+
             "update" => {
                 if msg.len() < 2 {
                     return;

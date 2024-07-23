@@ -10,7 +10,8 @@ struct Player {
     y: i32,
 }
 
-static mut PLAYER: Player = Player { id: 0, x: 3, y: 3 };
+const ARRAY_REPEAT_VALUE: Option<Player> = None;
+static mut PLAYERS: [Option<Player>; 10] = [ARRAY_REPEAT_VALUE; 10];
 
 
 pub async fn run_server(ip: &str, port: u16) {
@@ -44,9 +45,24 @@ pub async fn run_server(ip: &str, port: u16) {
 ///     }
 /// }
 async fn handle_connection(mut stream: TcpStream) {
-    let mut buf = [0; 1024];
+    let id = match add_player() {
+        // join
+        Ok(id) => {
+            println!("Player added");
+            id
+        }
 
+        // kick
+        Err(e) => {
+            eprintln!("{}", e);
+            return;
+        }
+    };
+
+    send_message(&mut stream, &format!("init {}", id)).await;
     send_message(&mut stream, &update_message()).await;
+    
+    let mut buf = [0; 1024];
     
     loop {
         let read = stream.read(&mut buf).await;
@@ -58,6 +74,9 @@ async fn handle_connection(mut stream: TcpStream) {
         match read {
             Ok(0) => {
                 println!("Connection closed");
+                unsafe {
+                    PLAYERS[id as usize] = None;
+                }
                 return;
             },
 
@@ -69,6 +88,9 @@ async fn handle_connection(mut stream: TcpStream) {
 
             Err(e) => {
                 eprintln!("Failed to read from socket; err = {:?}", e);
+                unsafe {
+                    PLAYERS[id as usize] = None;
+                }
                 return;
             },
         };
@@ -111,34 +133,56 @@ fn process_message(msg: &str) -> Option<String> {
     }
 }
 
+fn add_player() -> Result<u32, String> {
+    unsafe {
+        for i in 0..PLAYERS.len() {
+            if PLAYERS[i].is_none() {
+                PLAYERS[i] = Some(Player {
+                    id: i as u32,
+                    x: 3,
+                    y: 3,
+                });
+                return Ok(i as u32);
+            }
+        }
+    }
+
+    Err("Failed to add player".to_string())
+}
+
 fn move_player(id: u32, x: i32, y: i32) {
     println!("Move {}: ({}, {})", id, x, y);
 
     unsafe {
-        PLAYER.x += x;
-        PLAYER.y += y;
-
-        if PLAYER.x < 0 {
-            PLAYER.x = 0;
-        }
-        if PLAYER.y < 0 {
-            PLAYER.y = 0;
-        }
-        if PLAYER.x > 7 {
-            PLAYER.x = 7;
-        }
-        if PLAYER.y > 7 {
-            PLAYER.y = 7;
+        if let Some(player) = PLAYERS[id as usize].as_mut() {
+            player.x += x;
+            player.y += y;
+    
+            if player.x < 0 {
+                player.x = 0;
+            }
+            if player.y < 0 {
+                player.y = 0;
+            }
+            if player.x > 7 {
+                player.x = 7;
+            }
+            if player.y > 7 {
+                player.y = 7;
+            }
         }
     }
 }
 
 fn update_message() -> String {
-    let num_objects = 1usize;
-    let objects = vec![format!("{} {} {}", unsafe { PLAYER.id }, unsafe { PLAYER.x }, unsafe { PLAYER.y })]
-        .join(" ");
-
-    format!("update {} {}", num_objects, objects)
+    let objects = unsafe {
+        PLAYERS.iter()
+            .filter_map(|player| player.as_ref())
+            .map(|player| format!("{} {} {}", player.id, player.x, player.y))
+            .collect::<Vec<String>>()
+    };
+    
+    format!("update {} {}", objects.len(), objects.join(" "))
 }
 
 async fn send_message(stream: &mut TcpStream, msg: &str) {
