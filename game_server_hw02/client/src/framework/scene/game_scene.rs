@@ -234,7 +234,17 @@ impl GameScene {
                 }
 
                 // 기존에 있던 id가 안보이면 삭제
-                self.objects_from_server.retain(|k, _| valid_ids.contains(k));
+                self.objects_from_server.retain(|k, object| {
+                    let contains = valid_ids.contains(k);
+                    if !contains {
+                        if let Some(model) = object.model {
+                            unsafe {
+                                (*model).remove_instance(&object.transform);
+                            }
+                        }
+                    }
+                    contains
+                });
             }
             _ => {}
         }

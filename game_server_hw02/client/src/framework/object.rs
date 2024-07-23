@@ -3,7 +3,7 @@ use super::transform::*;
 
 
 pub struct Object {
-    pub model: Option<*const Model>,
+    pub model: Option<*mut Model>,
     pub transform: Transform,
 }
 

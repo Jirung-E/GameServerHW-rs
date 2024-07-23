@@ -145,6 +145,10 @@ impl Model {
     pub fn add_instance(&mut self, transform: &Transform) {
         self.instances.push(transform);
     }
+
+    pub fn remove_instance(&mut self, transform: &Transform) {
+        self.instances.retain(|&t| t != transform);
+    }
 }
 
 
