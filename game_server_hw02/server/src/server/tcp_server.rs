@@ -48,7 +48,7 @@ async fn handle_connection(mut stream: TcpStream) {
     let id = match add_player() {
         // join
         Ok(id) => {
-            println!("Player added");
+            println!("Player {} joined", id);
             id
         }
 
