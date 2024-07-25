@@ -1,9 +1,13 @@
 use super::model::*;
 use super::transform::*;
 
+use std::{
+    rc::Weak, 
+    cell::RefCell,
+};
 
 pub struct Object {
-    pub model: Option<*mut Model>,
+    pub model: Weak<RefCell<Model>>, 
     pub transform: Transform,
 }
 
@@ -11,13 +15,12 @@ pub struct Object {
 impl Object {
     pub fn new() -> Self {
         Self {
-            model: None,
+            model: Weak::new(), 
             transform: Transform::default(),
         }
     }
 
-    pub fn set_model(&mut self, model: &mut Model) {
-        model.add_instance(&self.transform);
-        self.model = Some(model);
+    pub fn set_model(&mut self, model: Weak<RefCell<Model>>) {
+        self.model = model;
     }
 }

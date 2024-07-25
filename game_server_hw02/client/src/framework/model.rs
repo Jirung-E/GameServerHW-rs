@@ -45,12 +45,18 @@ pub struct Mesh {
     // pub material: usize,
 }
 
-use super::transform::*;
+use super::object::*;
+
+use std::{
+    rc::Rc, 
+    cell::RefCell, 
+};
 
 pub struct Model {
     pub meshes: Vec<Mesh>,
     // pub materials: Vec<Material>,
-    pub instances: Vec<*const Transform>,
+    pub buffer: wgpu::Buffer, 
+    pub instances: Vec<Rc<RefCell<Object>>>,
 }
 
 impl Model {
@@ -60,8 +66,9 @@ impl Model {
         scale_factor: f32,
         base_color: Color,
     ) -> anyhow::Result<Model> {
-        use std::io::{BufReader, Cursor};
+        use std::{mem, io::{BufReader, Cursor}};
         use wgpu::util::DeviceExt;
+        use super::transform::*;
         use super::resources::*;
 
         let obj_text = load_string(file_name).await?;
@@ -82,6 +89,15 @@ impl Model {
         )
         .await?;
     
+        let buffer = device.create_buffer(
+            &wgpu::BufferDescriptor {
+                label: Some("Instance Buffer"), 
+                mapped_at_creation: false, 
+                size: (mem::size_of::<TransformRaw>() * 128) as wgpu::BufferAddress, 
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST, 
+            }
+        );
+
         let meshes = models
             .into_iter()
             .map(|m| {
@@ -139,47 +155,34 @@ impl Model {
             })
             .collect::<Vec<_>>();
     
-        Ok(Model { meshes, instances: Vec::new() })
+        Ok(Model { meshes, buffer, instances: Vec::with_capacity(128) })
     }
 
-    pub fn add_instance(&mut self, transform: &Transform) {
-        self.instances.push(transform);
+    pub fn add_instance(&mut self, object: Rc<RefCell<Object>>) {
+        self.instances.push(object);
     }
 
-    pub fn remove_instance(&mut self, transform: &Transform) {
-        self.instances.retain(|&t| t != transform);
-    }
-}
-
-
-
-
-
-use std::ops::Range;
-
-pub trait DrawModel<'a> {
-    fn draw_mesh(&mut self, mesh: &'a Mesh);
-    fn draw_mesh_instanced(
-        &mut self, 
-        mesh: &'a Mesh,
-        instances: Range<u32>,
-    );
-}
-
-impl<'a, 'b> DrawModel<'b> for wgpu::RenderPass<'a> 
-where 
-    'b: 'a,
-{
-    fn draw_mesh(&mut self, mesh: &'b Mesh) {
-        self.draw_mesh_instanced(mesh, 0..1);
+    pub fn remove_instance(&mut self, object: Rc<RefCell<Object>>) {
+        self.instances.retain(|obj| obj.as_ptr() != object.as_ptr());
     }
 
-    fn draw_mesh_instanced(
-        &mut self, mesh: &'b Mesh,
-        instances: Range<u32>,
-    ) {
-        self.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-        self.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-        self.draw_indexed(0..mesh.num_elements, 0, instances);
+    pub fn draw<'a>(&'a self, queue: &wgpu::Queue, rpass: &mut wgpu::RenderPass<'a>) {
+        let data: Vec<_> = self.instances.iter()
+            .map(|instance| instance.borrow().transform.to_raw())
+            .take(128)
+            .collect();
+
+        queue.write_buffer(
+            &self.buffer, 
+            0, 
+            bytemuck::cast_slice(&data)
+        );
+
+        rpass.set_vertex_buffer(1, self.buffer.slice(..));
+        for mesh in self.meshes.iter() {
+            rpass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+            rpass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            rpass.draw_indexed(0..mesh.num_elements, 0, 0..self.instances.len() as u32);
+        }
     }
 }
