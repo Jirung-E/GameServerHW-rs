@@ -8,7 +8,11 @@ use super::{
     color,
 };
 
-use std::iter::IntoIterator;
+use std::{
+    rc::Rc, 
+    cell::RefCell, 
+    iter::Iterator
+};
 
 
 pub trait Scene {
@@ -21,6 +25,6 @@ pub trait Scene {
     fn view_proj(&self) -> cgmath::Matrix4<f32>;
     fn background_color(&self) -> color::Color;
 
-    fn models(&self) -> impl IntoIterator<Item = &Model>;
-    fn objects(&self) -> impl IntoIterator<Item = &Object>;
+    fn models(&self) -> impl Iterator<Item = &Rc<RefCell<Model>>>;
+    fn objects(&self) -> impl Iterator<Item = &Rc<RefCell<Object>>>;
 }

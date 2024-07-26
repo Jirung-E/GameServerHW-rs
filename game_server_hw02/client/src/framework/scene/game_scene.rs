@@ -5,6 +5,8 @@ use winit::{
 use cgmath::{Vector2, Vector3, Point3};
 use futures::executor::block_on;
 use std::{
+    rc::Rc, 
+    cell::RefCell, 
     io::{Read, Write}, 
     net::TcpStream,
     collections::HashMap,
@@ -28,9 +30,9 @@ pub struct GameScene {
 
     background_color: Color,
 
-    models: Vec<Model>,
-    objects: Vec<Object>,
-    objects_from_server: HashMap<u32, Object>,
+    models: Vec<Rc<RefCell<Model>>>,
+    objects: Vec<Rc<RefCell<Object>>>,
+    objects_from_server: HashMap<u32, Rc<RefCell<Object>>>,
 
     player_id: u32,
 
@@ -85,39 +87,46 @@ impl GameScene {
 
     fn load_models(&mut self, device: &wgpu::Device) {
         block_on(async {
-            self.models = vec![
+            self.models = [
                 Model::load("cube.obj", device, 0.5, Color::LIGHT_GRAY).await.unwrap(),
                 Model::load("cube.obj", device, 0.5, Color::DARK_GRAY).await.unwrap(),
                 Model::load("pawn.obj", device, 0.8, Color::WHITE).await.unwrap(),
                 Model::load("pawn.obj", device, 0.8, Color::BLACK).await.unwrap(),
-            ];
+            ].into_iter()
+            .map(|model| Rc::new(RefCell::new(model)))
+            .collect();
         });
     }
 
     fn build_objects(&mut self) {
         self.objects = (0..64)
-            .map(|_| Object::new())
-            .collect::<Vec<_>>();
+            .into_iter()
+            .map(|idx| {
+                let object = Rc::new(RefCell::new(Object::new()));
+                
+                let x = idx % 8;
+                let z = idx / 8;
+                let model = self.models[(x+z) & 1].clone();
+                model.borrow_mut().add_instance(object.clone());
+                object.borrow_mut().set_model(Rc::downgrade(&model));
+                object.borrow_mut().transform.position = Vector3::new(
+                    x as f32, 
+                    -0.5, 
+                    z as f32
+                );
 
-        for (i, object) in self.objects.iter_mut().enumerate() {
-            let x = i % 8;
-            let z = i / 8;
-            object.set_model(&mut self.models[(x+z) & 1]);
-            object.transform.position = Vector3::new(
-                x as f32,
-                -0.5,
-                z as f32
-            );
-        }
+                object
+            })
+            .collect();
     }
 
-    fn player(&self) -> Option<&Object> {
-        self.objects_from_server.get(&self.player_id)
+    fn player(&self) -> Option<Rc<RefCell<Object>>> {
+        self.objects_from_server.get(&self.player_id).cloned()
     }
 
     fn update_camera(&mut self) {
         if let Some(player) = self.player(){
-            let p = player.transform.position;
+            let p = player.borrow().transform.position;
     
             let point = Point3::new(p.x, p.y, p.z);
     
@@ -210,23 +219,18 @@ impl GameScene {
                     let x = msg[idx+1].parse::<i32>().unwrap();
                     let z = msg[idx+2].parse::<i32>().unwrap();
 
-                    let object = if let Some(object) = self.objects_from_server.get_mut(&id) {
-                        object
-                    }
-                    else {
-                        self.objects_from_server.insert(id, Object::new());
-                        let object = self.objects_from_server.get_mut(&id).unwrap();
-                        
-                        if id == self.player_id {
-                            object.set_model(&mut self.models[2]);
-                        } 
-                        else {
-                            object.set_model(&mut self.models[3]);
-                        }
+                    let object = self.objects_from_server.entry(id)
+                        .or_insert_with(|| {
+                            let object = Rc::new(RefCell::new(Object::new()));
+                            let idx = if id == self.player_id { 2 } else { 3 };
+                            let model = self.models[idx].clone();
+                            
+                            model.borrow_mut().add_instance(object.clone());
+                            object.borrow_mut().set_model(Rc::downgrade(&model));
+                            object
+                        });
 
-                        object
-                    };
-
+                    let mut object = object.borrow_mut();
                     object.transform.position.x = x as f32;
                     object.transform.position.z = z as f32;
                     
@@ -237,10 +241,9 @@ impl GameScene {
                 self.objects_from_server.retain(|k, object| {
                     let contains = valid_ids.contains(k);
                     if !contains {
-                        if let Some(model) = object.model {
-                            unsafe {
-                                (*model).remove_instance(&object.transform);
-                            }
+                        if let Some(model) = object.borrow().model.upgrade() {
+                            let mut model = model.borrow_mut();
+                            model.remove_instance(object.clone());
                         }
                     }
                     contains
@@ -321,11 +324,11 @@ impl Scene for GameScene {
     }
     
 
-    fn models(&self) -> impl IntoIterator<Item = &Model> {
+    fn models(&self) -> impl Iterator<Item = &Rc<RefCell<Model>>> {
         self.models.iter()
     }
 
-    fn objects(&self) -> impl IntoIterator<Item = &Object> {
+    fn objects(&self) -> impl Iterator<Item = &Rc<RefCell<Object>>> {
         self.objects.iter().chain(self.objects_from_server.values())
     }
 }

@@ -42,8 +42,6 @@ pub struct State<'a> {
 
     render_pipeline: wgpu::RenderPipeline,
 
-    instance_buffer: wgpu::Buffer,
-
     depth_texture: Texture,
 
     camera_uniform: CameraUniform,
@@ -248,15 +246,6 @@ impl<'a> State<'a> {
 
         let depth_texture = Texture::create_depth_texture(&device, &config, "depth_texture");
 
-        
-        let instance_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Instance Buffer"),
-                contents: &[],
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            }
-        );
-
         let mut scene = GameScene::new().await;
         scene.init(&device);
 
@@ -272,8 +261,6 @@ impl<'a> State<'a> {
             background_color,
 
             render_pipeline,
-
-            instance_buffer,
 
             depth_texture,
 
@@ -324,6 +311,10 @@ impl<'a> State<'a> {
             label: Some("Render Encoder"),
         });
 
+        let models: Vec<_> = self.scene.models()
+            .map(|model| model.borrow())
+            .collect();
+
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
@@ -352,25 +343,9 @@ impl<'a> State<'a> {
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
             
-            let instance_data = self.scene.models().into_iter()
-                .flat_map(|model| model.instances.iter())
-                .map(|instance| unsafe { (**instance).to_raw() })
-                .collect::<Vec<_>>();
-
-            self.instance_buffer = self.device.create_buffer_init(
-                &wgpu::util::BufferInitDescriptor {
-                    label: Some("Instance Buffer"),
-                    contents: bytemuck::cast_slice(&instance_data),
-                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                }
-            );
-
-            render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
             
-            let mut offset = 0;
-            for model in self.scene.models() {
-                render_pass.draw_mesh_instanced(&model.meshes[0], offset..offset + model.instances.len() as u32);
-                offset += model.instances.len() as u32;
+            for model in models.iter() {
+                model.draw(&self.queue, &mut render_pass);
             }
         }
     
