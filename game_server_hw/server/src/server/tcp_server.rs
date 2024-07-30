@@ -25,7 +25,7 @@ pub async fn run_server(ip: &str, port: u16) {
 }
 
 
-const MAX_CLIENTS: usize = World::MAX_PLAYERS as usize;
+const MAX_CLIENTS: usize =  10;
 /// World를 직접 읽으면 최신 데이터가 아닐 가능성이 있다.  
 /// World에 Mutex, RwLock등을 걸면 클라이언트가 읽는데 병목이 생길 수 있다.  
 /// 따라서 클라이언트 개수만 세기 위해 따로 분리.  

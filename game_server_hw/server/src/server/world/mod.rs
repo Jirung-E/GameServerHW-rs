@@ -18,8 +18,6 @@ pub struct World {
 }
 
 impl World {
-    pub const MAX_PLAYERS: u32 = 10;
-
     pub fn new() -> Self {
         let (sender, receiver) = mpsc::channel(128);
         Self {
