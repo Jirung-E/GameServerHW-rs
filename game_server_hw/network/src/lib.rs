@@ -1,15 +1,20 @@
 mod packet;
 
-use packet::{Packet::{self, *}, Message};
+use packet::Packet::{self, *};
 use std::collections::VecDeque;
+use bytes::Bytes;
 
 
 /// 뭉쳐온 패킷 분리 및 잘린 패킷 이어붙이기를 수행하는 큐 형태의 Parser
-pub struct PacketParser(VecDeque<Packet>);
+pub struct PacketParser {
+    queue: VecDeque<Packet>,
+}
 
 impl PacketParser {
     pub fn new() -> Self {
-        Self(VecDeque::new())
+        Self {
+            queue: VecDeque::new(),
+        }
     }
 
     pub fn push(&mut self, data: &[u8]) {
@@ -17,88 +22,70 @@ impl PacketParser {
             return;
         }
 
-        // trim하면 안됨
-        // 'init 3 1 2'이 들어올때 'init 3', ' 1 2',으로 나눠져서 오면
-        // 'init 31 2'가 되어버림
-        let mut data = data.split_inclusive(|&x| x == b'\n')
-            .map(|x| x.to_vec())
-            .collect::<Vec<_>>();
+        let mut data: Vec<Bytes> = data.split_inclusive(|&x| x == b'\n')
+            .map(|x| Bytes::copy_from_slice(x))
+            .collect();
 
-        if let Some(Incomplete(prev)) = self.0.back() {
-            data[0] = prev.iter().chain(data[0].iter())
+        if let Some(Incomplete(prev)) = self.queue.back() {
+            data[0] = prev.iter()
+                .chain(data[0].iter())
                 .copied()
                 .collect();
-            self.0.pop_back();
+            self.queue.pop_back();
         }
 
         for data in data {
-            if data.is_empty() {
-                continue;
-            }
-
-            self.0.push_back(Self::parse(data));
+            self.queue.push_back(self.parse(data));
         }
     }
 
-    fn parse(data: Vec<u8>) -> Packet {
+    fn parse(&self, data: Bytes) -> Packet {
         let len = data.len();
 
         if data[len - 1] != b'\n' {
             return Incomplete(data);
         }
-
-        let data = &data[..len - 1];
-
-        let message: Vec<&[u8]> = data.split(|&x| x == b' ')
-            .collect();
-
-        match message[0] {
-            b"update" => {
-                Complete(Message::Update)
-            },
-
-            b"remove" => {
-                Complete(Message::Remove)
-            },
-
-            _ => Complete(Message::Unknown),
-        }
+        
+        Complete(data.slice(..len - 1))
     }
 
     /// 한개 남았을 때 Incomplete이면 아직 완성 안된것이므로 pop하지 않음.  
     /// 두개 이상 남았을때 제일 앞 패킷이 Incomplete이면 모종의 이유로 완성 안된것이므로 값을 버리기 위해 pop.  
-    pub fn pop(&mut self) -> Option<Packet> {
-        if self.0.len() == 1 {
-            if let Some(Incomplete(_)) = self.0.front() {
+    pub fn pop(&mut self) -> Option<Bytes> {
+        if self.queue.len() == 1 {
+            if let Some(Incomplete(_)) = self.queue.front() {
                 return None;
             }
         }
 
-        self.0.pop_front()
+        match self.queue.pop_front() {
+            Some(Complete(some)) => Some(some),
+            _ => None,
+        }
     }
 
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.queue.is_empty()
     }
 
     pub fn clear(&mut self) {
-        self.0.clear();
+        self.queue.clear();
     }
 
     pub fn front(&self) -> Option<&Packet> {
-        self.0.front()
+        self.queue.front()
     }
 
     pub fn back(&self) -> Option<&Packet> {
-        self.0.back()
+        self.queue.back()
     }
 
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.queue.len()
     }
 
     pub fn iter(&self) -> std::collections::vec_deque::Iter<Packet> {
-        self.0.iter()
+        self.queue.iter()
     }
 }
 
@@ -115,13 +102,13 @@ mod tests {
         let mut parser = PacketParser::new();
 
         parser.push(b"update\n");
-        assert_eq!(parser.pop(), Some(Complete(Message::Update)));
+        assert_eq!(parser.pop(), Some(b"update".as_slice().into()));
 
         parser.push(b"remove\n");
-        assert_eq!(parser.pop(), Some(Complete(Message::Remove)));
+        assert_eq!(parser.pop(), Some(b"remove".as_slice().into()));
 
         parser.push(b"init 3 2 5 6\n");
-        assert_eq!(parser.pop(), Some(Complete(Message::Unknown)));
+        assert_eq!(parser.pop(), Some(b"init 3 2 5 6".as_slice().into()));
     }
 
     #[test]
@@ -129,37 +116,33 @@ mod tests {
         let mut parser = PacketParser::new();
         
         parser.push(b"upda");
-        assert_eq!(parser.iter().last(), Some(&Incomplete(b"upda".to_vec())));
+        assert_eq!(parser.iter().last(), Some(&Incomplete(b"upda".as_slice().into())));
         assert_eq!(parser.pop(), None);
 
         parser.push(b"te\n");
-        assert_eq!(parser.iter().last(), Some(&Complete(Message::Update)));
-        assert_eq!(parser.pop(), Some(Complete(Message::Update)));
+        assert_eq!(parser.iter().last(), Some(&Complete(b"update".as_slice().into())));
+        assert_eq!(parser.pop(), Some(b"update".as_slice().into()));
 
         parser.push(b"remove");
-        assert_eq!(parser.iter().last(), Some(&Incomplete(b"remove".to_vec())));
+        assert_eq!(parser.iter().last(), Some(&Incomplete(b"remove".as_slice().into())));
         assert_eq!(parser.pop(), None);
 
         parser.push(b"\n");
-        assert_eq!(parser.iter().last(), Some(&Complete(Message::Remove)));
-        assert_eq!(parser.pop(), Some(Complete(Message::Remove)));
+        assert_eq!(parser.iter().last(), Some(&Complete(b"remove".as_slice().into())));
+        assert_eq!(parser.pop(), Some(b"remove".as_slice().into()));
 
-        parser.push(b"init 3 2 5 6\nupdate\nre");
-        let quess = vec![
-            Complete(Message::Unknown),
-            Complete(Message::Update),
-            Incomplete(b"re".to_vec()),
+        parser.push(b"update\nupdate\nre");
+        let mut quess = vec![
+            Complete(b"update".as_slice().into()),
+            Complete(b"update".as_slice().into()),
+            Incomplete(b"re".as_slice().into()),
         ];
         for it in parser.iter().zip(quess.iter()) {
             assert_eq!(it.0, it.1);
         }
 
         parser.push(b"move\n");
-        let quess = vec![
-            Complete(Message::Unknown),
-            Complete(Message::Update),
-            Complete(Message::Remove),
-        ];
+        quess[2] = Complete(b"remove".as_slice().into());
         for it in parser.iter().zip(quess.iter()) {
             assert_eq!(it.0, it.1);
         }
@@ -174,7 +157,7 @@ mod tests {
 
         parser.push(b"\n");
         assert_eq!(parser.len(), 1);
-        assert_eq!(parser.pop(), Some(Complete(Message::Unknown)));
+        assert_eq!(parser.pop(), Some(b"".as_slice().into()));
     }
 
     #[test]
@@ -185,7 +168,7 @@ mod tests {
         assert_eq!(parser.pop(), None);
 
         parser.push(b"te\n");
-        assert_eq!(parser.pop(), Some(Complete(Message::Update)));
+        assert_eq!(parser.pop(), Some(b"update".as_slice().into()));
     }
 
     #[test]
@@ -198,23 +181,6 @@ mod tests {
         let packets = b"update\nupdate\nremove\ninit 3 2 5 6\nhello!\n\n\n \nupdate\nstart localhost:8080\nremove\n";
         parser.push(packets);
         assert_eq!(parser.len(), packets.iter().filter(|&&x| x == b'\n').count());
-
-        let quess = vec![
-            Complete(Message::Update),
-            Complete(Message::Update),
-            Complete(Message::Remove),
-            Complete(Message::Unknown),
-            Complete(Message::Unknown),
-            Complete(Message::Unknown),
-            Complete(Message::Unknown),
-            Complete(Message::Unknown),
-            Complete(Message::Update),
-            Complete(Message::Unknown),
-            Complete(Message::Remove),
-        ];
-        for it in parser.iter().zip(quess.iter()) {
-            assert_eq!(it.0, it.1);
-        }
     }
 
     #[test]
@@ -236,22 +202,5 @@ mod tests {
             packets3.iter().filter(|&&x| x == b'\n').count() + 
             packets4.iter().filter(|&&x| x == b'\n').count()
         );
-
-        let quess = vec![
-            Complete(Message::Update),
-            Complete(Message::Update),
-            Complete(Message::Remove),
-            Complete(Message::Unknown),
-            Complete(Message::Unknown),
-            Complete(Message::Unknown),
-            Complete(Message::Unknown),
-            Complete(Message::Unknown),
-            Complete(Message::Update),
-            Complete(Message::Unknown),
-            Complete(Message::Remove),
-        ];
-        for it in parser.iter().zip(quess.iter()) {
-            assert_eq!(it.0, it.1);
-        }
     }
 }
