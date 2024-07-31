@@ -3,11 +3,15 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
 };
 use super::world::WorldInterface;
+use network::*;
 
 
 pub struct Client {
     id: u32,
+    
     stream: TcpStream,
+    packet_parser: PacketParser,
+
     world: WorldInterface,
 }
 
@@ -16,6 +20,7 @@ impl Client {
         Self {
             id,
             stream,
+            packet_parser: PacketParser::new(),
             world,
         }
     }
@@ -36,8 +41,7 @@ impl Client {
                 },
     
                 Ok(n) => {
-                    let msg = String::from_utf8_lossy(&buf[..n]);
-                    self.process_messages(&msg).await;
+                    self.process_packets(&buf[..n]).await;
                 },
     
                 Err(e) => {
@@ -50,12 +54,14 @@ impl Client {
         self.world.remove_player(self.id).await;
     }
 
-    pub async fn process_messages(&mut self, msg: &str) {
-        let messages = msg.trim().split("\n")
-            .collect::<Vec<&str>>();
+    
+    async fn process_packets(&mut self, data: &[u8]) {
+        self.packet_parser.push(data);
 
-        for msg in messages {
-            if let Some(response) = self.process_message(msg).await {
+        while let Some(packet) = self.packet_parser.pop() {
+            let msg = String::from_utf8_lossy(&packet);
+
+            if let Some(response) = self.process_message(&msg).await {
                 self.stream_write(&response).await;
             }
         }
@@ -88,7 +94,7 @@ impl Client {
         }
     }
 
-    pub async fn stream_write(&mut self, msg: &str) {
+    async fn stream_write(&mut self, msg: &str) {
         let msg = format!("GAMESERVER {}\n", msg);
         self.stream.write_all(msg.as_bytes()).await
             .expect("Failed to write to socket");

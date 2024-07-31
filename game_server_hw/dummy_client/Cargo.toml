@@ -7,3 +7,4 @@ edition = "2021"
 tokio = { version = "1.39.2", features = ["full"] }
 
 get_addr = { path = "../get_addr" }
+network = { path = "../network" }

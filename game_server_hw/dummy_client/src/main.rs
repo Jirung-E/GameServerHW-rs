@@ -8,6 +8,7 @@ use std::{
     collections::HashMap,
 };
 use get_addr::get_addr;
+use network::PacketParser;
 
 
 struct Player {
@@ -22,6 +23,7 @@ struct Server {
 
     addr: String,
     stream: TcpStream,
+    packet_parser: PacketParser,
 
     prev_update: std::time::Instant,
 }
@@ -47,6 +49,7 @@ impl Server {
 
             addr,
             stream,
+            packet_parser: PacketParser::new(),
 
             prev_update: std::time::Instant::now(),
         }
@@ -56,21 +59,18 @@ impl Server {
         self.players.get(&self.player_id).cloned()
     }
 
-    fn pull_messages(&mut self) -> Option<String> {
+    fn pull_messages(&mut self) {
         let mut buf = [0; 1024];
 
         match self.stream.read(&mut buf) {
             Ok(0) => {
                 println!("Connection closed");
-                None
             },
             Ok(n) => {
-                let msg = String::from_utf8_lossy(&buf[..n]);
-                // println!("Received: {}", msg);
-                Some(msg.to_string())
+                self.packet_parser.push(&buf[..n]);
             },
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                None
+                
             },
             Err(e) => {
                 eprintln!("Failed to read from socket; err = {:?}", e);
@@ -78,11 +78,10 @@ impl Server {
                     Ok(stream) => {
                         self.stream = stream;
                         self.stream.set_nonblocking(true).unwrap();
-                        self.pull_messages()
+                        self.pull_messages();
                     },
                     Err(e) => {
                         eprintln!("Failed to reconnect; err = {:?}", e);
-                        None
                     }
                 }
             }
@@ -163,7 +162,10 @@ impl Server {
         self.stream.write_all(b"update\n")
             .expect("Failed to write to stream");
 
-        while let Some(msg) = self.pull_messages() {
+        self.pull_messages();
+
+        while let Some(msg) = self.packet_parser.pop() {
+            let msg = String::from_utf8_lossy(&msg);
             self.process_messages(&msg);
         }
     }
