@@ -1,29 +1,7 @@
+mod packet;
+
+use packet::{Packet::{self, *}, Message};
 use std::collections::VecDeque;
-
-
-#[derive(Debug, PartialEq)]
-pub enum Message {
-    Update,
-    Remove,
-    Unknown,
-}
-
-#[derive(Debug)]
-pub enum Packet {
-    Complete(Message),
-    Incomplete(Vec<u8>),
-}
-use Packet::*;
-
-impl PartialEq for Packet {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Complete(a), Complete(b)) => a == b,
-            (Incomplete(a), Incomplete(b)) => String::from_utf8_lossy(a) == String::from_utf8_lossy(b),
-            _ => false,
-        }
-    }
-}
 
 
 /// 뭉쳐온 패킷 분리 및 잘린 패킷 이어붙이기를 수행하는 큐 형태의 Parser
@@ -46,35 +24,36 @@ impl PacketParser {
             .map(|x| x.to_vec())
             .collect::<Vec<_>>();
 
-        match self.0.back() {
-            Some(Incomplete(prev)) => {
-                data[0] = prev.iter().chain(data[0].iter())
-                    .copied()
-                    .collect();
-                self.0.pop_back();
-            },
-            _ => {},
-        };
+        if let Some(Incomplete(prev)) = self.0.back() {
+            data[0] = prev.iter().chain(data[0].iter())
+                .copied()
+                .collect();
+            self.0.pop_back();
+        }
 
         for data in data {
             if data.is_empty() {
                 continue;
             }
 
-            let message: Vec<&[u8]> = data.split(|&x| x == b' ')
-                .collect();
+            self.0.push_back(Self::parse(data));
+        }
+    }
 
-            match message[0] {
-                b"update" => {
-                    self.0.push_back(Complete(Message::Update));
-                },
-                b"remove" => {
-                    self.0.push_back(Complete(Message::Remove));
-                },
-                _ => {
-                    self.0.push_back(Incomplete(data));
-                },
-            }
+    fn parse(data: Vec<u8>) -> Packet {
+        let message: Vec<&[u8]> = data.split(|&x| x == b' ')
+            .collect();
+
+        match message[0] {
+            b"update" => {
+                Complete(Message::Update)
+            },
+
+            b"remove" => {
+                Complete(Message::Remove)
+            },
+
+            _ => Incomplete(data),
         }
     }
 
@@ -119,10 +98,20 @@ mod tests {
             Incomplete(b"init".to_vec()),
         ];
 
-        assert_eq!(parser.len(), 3);
+        assert_eq!(parser.len(), answer.len());
         
         for (a, b) in parser.iter().zip(answer.iter()) {
             assert_eq!(a, b);
         }
+
+        assert_eq!(parser.pop(), Some(Complete(Message::Update)));
+
+        parser.push(b"upda");
+        assert_eq!(parser.iter().last(), Some(&Incomplete(b"upda".to_vec())));
+
+        parser.push(b"te\n");
+        assert_eq!(parser.iter().last(), Some(&Complete(Message::Update)));
+
+
     }
 }
