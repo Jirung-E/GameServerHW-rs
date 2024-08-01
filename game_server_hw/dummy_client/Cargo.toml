@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.39.2", features = ["full"] }
+futures = "0.3.30"
 
 get_addr = { path = "../get_addr" }
 network = { path = "../network" }
