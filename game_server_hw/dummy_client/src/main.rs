@@ -3,9 +3,11 @@
 use std::{
     rc::Rc, 
     cell::RefCell, 
-    io::{Read, Write}, 
-    net::TcpStream,
     collections::HashMap,
+};
+use tokio::{
+    net::TcpStream,
+    io::{AsyncReadExt, AsyncWriteExt},
 };
 use get_addr::get_addr;
 use network::PacketParser;
@@ -24,23 +26,20 @@ struct Server {
     addr: String,
     stream: TcpStream,
     packet_parser: PacketParser,
+    pps: u32,
 
     prev_update: std::time::Instant,
 }
 
 impl Server {
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         let (ip, port) = match get_addr() {
             Ok((ip, port)) => (ip, port),
-            Err(e) => {
-                panic!("{}", e);
-            }
+            Err(e) => panic!("{}", e),
         };
-        // let ip = "127.0.0.1".to_string();
-        // let port = 8080;
+        
         let addr = format!("{}:{}", ip, port);
-        let stream = TcpStream::connect(addr.clone()).unwrap();
-        stream.set_nonblocking(true).unwrap();
+        let stream = TcpStream::connect(addr.clone()).await.unwrap();
 
         Self {
             players: HashMap::new(),
@@ -50,6 +49,7 @@ impl Server {
             addr,
             stream,
             packet_parser: PacketParser::new(),
+            pps: 0,
 
             prev_update: std::time::Instant::now(),
         }
@@ -59,42 +59,15 @@ impl Server {
         self.players.get(&self.player_id).cloned()
     }
 
-    fn pull_messages(&mut self) {
+    async fn pull_messages(&mut self) {
         let mut buf = [0; 1024];
 
-        match self.stream.read(&mut buf) {
-            Ok(0) => {
-                println!("Connection closed");
-            },
-            Ok(n) => {
-                self.packet_parser.push(&buf[..n]);
-            },
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                
-            },
-            Err(e) => {
-                eprintln!("Failed to read from socket; err = {:?}", e);
-                match TcpStream::connect(self.addr.clone()) {
-                    Ok(stream) => {
-                        self.stream = stream;
-                        self.stream.set_nonblocking(true).unwrap();
-                        self.pull_messages();
-                    },
-                    Err(e) => {
-                        eprintln!("Failed to reconnect; err = {:?}", e);
-                    }
-                }
-            }
-        }
-    }
+        match self.stream.read(&mut buf).await {
+            Ok(0) => println!("Connection closed"),
+            
+            Ok(n) => self.packet_parser.push(&buf[..n]),
 
-    fn process_messages(&mut self, msg: &str) {
-        let messages = msg.trim().split("\n").collect::<Vec<&str>>();
-
-        // println!("messages: {:?}", messages);
-
-        for msg in messages {
-            self.process_message(msg);
+            Err(e) => eprintln!("Failed to read from socket; err = {:?}", e),
         }
     }
     
@@ -129,10 +102,10 @@ impl Server {
                     return;
                 }
 
-                let time = std::time::Instant::now();
-                let elapsed = time.duration_since(self.prev_update);
-                println!("Elapsed(id: {}): {:?}", self.player_id, elapsed);
-                self.prev_update = time;
+                // let time = std::time::Instant::now();
+                // let elapsed = time.duration_since(self.prev_update);
+                // println!("Elapsed(id: {}): {:?}", self.player_id, elapsed);
+                // self.prev_update = time;
 
                 let num_objects = msg[1].parse::<usize>().unwrap();
                 let mut valid_ids: Vec<u32> = Vec::new();
@@ -158,15 +131,22 @@ impl Server {
         }
     }
 
-    fn update(&mut self) {
-        self.stream.write_all(b"update\n")
+    async fn update(&mut self) {
+        self.stream.write_all(b"update\n").await
             .expect("Failed to write to stream");
 
-        self.pull_messages();
+        self.pull_messages().await;
 
         while let Some(msg) = self.packet_parser.pop() {
+            self.pps += 1;
+            if self.prev_update.elapsed().as_secs() >= 1 {
+                println!("server {} pps: {}", self.player_id, self.pps);
+                self.pps = 0;
+                self.prev_update = std::time::Instant::now();
+            }
+            
             let msg = String::from_utf8_lossy(&msg);
-            self.process_messages(&msg);
+            self.process_message(&msg);
         }
     }
 }
@@ -175,21 +155,135 @@ impl Server {
 
 #[tokio::main]
 async fn main() {
-    for _ in 0..10 {
-        tokio::spawn(async {
-            new_server();
-        });
-    }
+    tokio::join!(
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
 
-    loop {
-        
-    }
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+        new_server(),
+    );
+
+    println!("done");
 }
 
-fn new_server() {
-    let mut server = Server::new();
+async fn new_server() {
+    let mut server = Server::new().await;
 
     loop {
-        server.update();
+        server.update().await;
     }
 }
