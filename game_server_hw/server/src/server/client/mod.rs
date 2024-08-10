@@ -13,6 +13,8 @@ pub struct Client {
     packet_parser: PacketParser,
 
     world: WorldInterface,
+
+    running: bool,
 }
 
 impl Client {
@@ -22,6 +24,7 @@ impl Client {
             stream,
             packet_parser: PacketParser::new(),
             world,
+            running: true,
         }
     }
 
@@ -31,7 +34,7 @@ impl Client {
 
         let mut buf = [0; 1024];
     
-        loop {
+        while self.running {
             let read = self.stream.read(&mut buf).await;
     
             match read {
@@ -96,7 +99,13 @@ impl Client {
 
     async fn stream_write(&mut self, msg: &str) {
         let msg = format!("GAMESERVER {}\n", msg);
-        self.stream.write_all(msg.as_bytes()).await
-            .expect("Failed to write to socket");
+        
+        match self.stream.write_all(msg.as_bytes()).await {
+            Ok(_) => {},
+            Err(e) => {
+                eprintln!("Failed to write to socket; err = {:?}", e);
+                self.running = false;
+            }
+        }
     }
 }
