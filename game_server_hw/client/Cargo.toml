@@ -18,6 +18,7 @@ tokio = { version = "1.38.1", features = ["full"] }
 lockfree = "0.5.1"
 
 get_addr = { path = "../get_addr" }
+network = { path = "../network" }
 
 [build-dependencies]
 anyhow = "1.0"

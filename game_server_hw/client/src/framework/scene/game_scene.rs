@@ -13,6 +13,7 @@ use std::{
     iter::IntoIterator,
 };
 use get_addr::get_addr;
+use network::PacketParser;
 
 use super::super::{
     camera::{Camera, CameraComponent, DefaultCamera},
@@ -36,10 +37,8 @@ pub struct GameScene {
 
     player_id: u32,
 
-    // ip: String,
-    // port: u16,
-    addr: String,
     stream: TcpStream,
+    packet_parser: PacketParser,
 }
 
 impl GameScene {
@@ -63,7 +62,7 @@ impl GameScene {
         // let ip = "127.0.0.1".to_string();
         // let port = 8080;
         let addr = format!("{}:{}", ip, port);
-        let stream = TcpStream::connect(addr.clone()).unwrap();
+        let stream = TcpStream::connect(addr).unwrap();
         stream.set_nonblocking(true).unwrap();
 
         Self {
@@ -80,8 +79,8 @@ impl GameScene {
 
             // ip,
             // port,
-            addr,
             stream,
+            packet_parser: PacketParser::new(),
         }
     }
 
@@ -135,47 +134,23 @@ impl GameScene {
         }
     }
 
-    fn pull_messages(&mut self) -> Option<String> {
+    fn pull_messages(&mut self) {
         let mut buf = [0; 1024];
 
         match self.stream.read(&mut buf) {
             Ok(0) => {
                 println!("Connection closed");
-                None
             },
             Ok(n) => {
-                let msg = String::from_utf8_lossy(&buf[..n]);
                 // println!("Received: {}", msg);
-                Some(msg.to_string())
+                self.packet_parser.push(&buf[..n]);
             },
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                 // println!("Would block");
-                None
             },
-            Err(e) => {
-                eprintln!("Failed to read from socket; err = {:?}", e);
-                match TcpStream::connect(self.addr.clone()) {
-                    Ok(stream) => {
-                        self.stream = stream;
-                        self.stream.set_nonblocking(true).unwrap();
-                        self.pull_messages()
-                    },
-                    Err(e) => {
-                        eprintln!("Failed to reconnect; err = {:?}", e);
-                        None
-                    }
-                }
+            Err(_) => {
+                
             }
-        }
-    }
-
-    fn process_messages(&mut self, msg: &str) {
-        let messages = msg.trim().split("\n").collect::<Vec<&str>>();
-
-        // println!("messages: {:?}", messages);
-
-        for msg in messages {
-            self.process_message(msg);
         }
     }
     
@@ -307,8 +282,11 @@ impl Scene for GameScene {
         self.stream.write_all(b"update\n")
             .expect("Failed to write to stream");
 
-        while let Some(msg) = self.pull_messages() {
-            self.process_messages(&msg);
+        self.pull_messages();
+
+        while let Some(msg) = self.packet_parser.pop() {
+            let msg = String::from_utf8_lossy(&msg);
+            self.process_message(&msg);
         }
 
         self.update_camera();
