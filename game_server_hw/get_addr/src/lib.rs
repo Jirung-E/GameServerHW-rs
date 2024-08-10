@@ -15,7 +15,7 @@ pub fn get_addr() -> Result<(String, u16), String> {
     }
 
     let addr = if args.len() == 1 {
-        "public:8080"
+        "public:7878"
     }
     else {
         &args[1]
