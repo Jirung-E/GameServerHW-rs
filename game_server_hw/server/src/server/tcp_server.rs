@@ -13,7 +13,7 @@ pub async fn run_server(ip: &str, port: u16) {
     let tcp_listener = TcpListener::bind(addr.clone()).await
         .expect("Failed to bind tcp listener");
 
-    println!("Tcp server - listening on: {}", addr);
+    println!("Tcp server - listening on: {}", tcp_listener.local_addr().unwrap());
 
     let mut world = World::new();
 
