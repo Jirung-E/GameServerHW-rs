@@ -31,7 +31,7 @@ impl World {
         loop {
             match self.receiver.recv().await {
                 Some(msg) => {
-                    println!("channel received: {}", msg);
+                    // println!("channel received: {}", msg);
 
                     let msg = msg.split_whitespace()
                         .collect::<Vec<&str>>();
@@ -58,7 +58,7 @@ impl World {
                     }
                 },
                 None => {
-                    println!("channel closed");
+                    // println!("channel closed");
                     break;
                 }
             }
@@ -71,7 +71,7 @@ impl World {
     }
 
     pub fn move_player(&mut self, id: u32, x: i32, y: i32) {
-        println!("Move {}: ({}, {})", id, x, y);
+        // println!("Move {}: ({}, {})", id, x, y);
 
         if let Some(player) = self.players.get_mut(&id) {
             player.x += x;

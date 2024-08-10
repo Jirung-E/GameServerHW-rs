@@ -30,7 +30,17 @@ impl Client {
 
     pub async fn handle_connection(&mut self) {
         self.world.add_player(self.id).await;
-        self.stream_write(&format!("init {}", self.id)).await;
+
+        match self.stream_write(&format!("init {}", self.id)).await {
+            Ok(_) => {
+                // println!("Client {} connected", self.id);
+            },
+            Err(_) => {
+                // eprintln!("Failed to init client {}", self.id);
+                self.running = false;
+                return;
+            }
+        }
 
         let mut buf = [0; 1024];
     
@@ -39,7 +49,7 @@ impl Client {
     
             match read {
                 Ok(0) => {
-                    println!("Connection closed");
+                    // println!("Connection closed");
                     break;
                 },
     
@@ -47,8 +57,8 @@ impl Client {
                     self.process_packets(&buf[..n]).await;
                 },
     
-                Err(e) => {
-                    eprintln!("Failed to read from socket; err = {:?}", e);
+                Err(_) => {
+                    // eprintln!("Failed to read from socket; err = {:?}", e);
                     break;
                 },
             };
@@ -65,7 +75,14 @@ impl Client {
             let msg = String::from_utf8_lossy(&packet);
 
             if let Some(response) = self.process_message(&msg).await {
-                self.stream_write(&response).await;
+                match self.stream_write(&response).await {
+                    Ok(_) => {},
+                    Err(_) => {
+                        self.running = false;
+                        // eprintln!("Failed to write to socket; err = {:?}", e);
+                        break;
+                    }
+                }
             }
         }
     }
@@ -97,15 +114,9 @@ impl Client {
         }
     }
 
-    async fn stream_write(&mut self, msg: &str) {
+    async fn stream_write(&mut self, msg: &str) -> Result<(), std::io::Error> {
         let msg = format!("GAMESERVER {}\n", msg);
         
-        match self.stream.write_all(msg.as_bytes()).await {
-            Ok(_) => {},
-            Err(e) => {
-                eprintln!("Failed to write to socket; err = {:?}", e);
-                self.running = false;
-            }
-        }
+        self.stream.write_all(msg.as_bytes()).await
     }
 }

@@ -36,27 +36,27 @@ static CLIENT_SLOTS: Mutex<[Option<()>; MAX_CLIENTS]> = Mutex::new([None; MAX_CL
 /// Listens for incoming connections
 async fn wait_for_players(listener: TcpListener, world: WorldPointer) {
     loop {
-        println!("Waiting for connection...");
+        // println!("Waiting for connection...");
         match listener.accept().await {
-            Ok((stream, addr)) => {
+            Ok((stream, _addr)) => {
                 let mut slots = CLIENT_SLOTS.lock().unwrap();
                 let mut accepted = false;
 
                 for id in 0..MAX_CLIENTS {
                     if slots[id].is_none() {
                         slots[id] = Some(());
-                        println!("Accepted connection from: {}", addr);
+                        // println!("Accepted connection from: {}", addr);
                         accepted = true;
                         tokio::spawn(handle_connection(id as u32, stream, world));
                         break;
                     }
                 }
                 if !accepted {
-                    println!("Connection from {} refused; server full", addr);
+                    // println!("Connection from {} refused; server full", addr);
                 }
             },
-            Err(e) => {
-                eprintln!("Failed to accept connection; err = {:?}", e);
+            Err(_) => {
+                // eprintln!("Failed to accept connection; err = {:?}", e);
             }
         }
     }
@@ -65,10 +65,19 @@ async fn wait_for_players(listener: TcpListener, world: WorldPointer) {
 
 async fn handle_connection(id: u32, stream: TcpStream, world: WorldPointer) {
     let mut client = Client::new(id, stream, WorldInterface::new(world));
+
+    {
+        let slots = CLIENT_SLOTS.lock().unwrap();
+        println!("num clients: {}", slots.iter().filter(|x| x.is_some()).count());
+    }
     
     client.handle_connection().await;
 
-    let mut slots = CLIENT_SLOTS.lock().unwrap();
-    slots[id as usize] = None;
-    println!("Connection {} closed", id);
+    {
+        let mut slots = CLIENT_SLOTS.lock().unwrap();
+        slots[id as usize] = None;
+        println!("Connection {} closed", id);
+
+        println!("num clients: {}", slots.iter().filter(|x| x.is_some()).count());
+    }
 }
