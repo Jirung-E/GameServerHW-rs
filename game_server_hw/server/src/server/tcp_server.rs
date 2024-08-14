@@ -15,13 +15,9 @@ pub async fn run_server(ip: &str, port: u16) {
 
     println!("Tcp server - listening on: {}", tcp_listener.local_addr().unwrap());
 
-    let mut world = World::new();
+    let world = World::new();
 
-    {
-        tokio::spawn(wait_for_players(tcp_listener, (&world).into()));
-    }
-
-    world.run_message_loop().await; 
+    wait_for_players(tcp_listener, (&world).into()).await;
 }
 
 
@@ -30,7 +26,6 @@ const MAX_CLIENTS: usize =  10000;
 /// World에 Mutex, RwLock등을 걸면 클라이언트가 읽는데 병목이 생길 수 있다.  
 /// 따라서 클라이언트 개수만 세기 위해 따로 분리.  
 static CLIENT_SLOTS: Mutex<[Option<()>; MAX_CLIENTS]> = Mutex::new([None; MAX_CLIENTS]);
-
 
 
 /// Listens for incoming connections
