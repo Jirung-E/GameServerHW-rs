@@ -172,7 +172,7 @@ use futures::future::join_all;
 
 #[tokio::main]
 async fn main() {
-    let servers = (0..10).map(|_| new_server());
+    let servers = (0..1000).map(|_| new_server());
     join_all(servers).await;
 
     println!("done");

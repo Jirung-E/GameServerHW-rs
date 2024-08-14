@@ -71,6 +71,7 @@ impl Into<WorldPointer> for &World {
 
 /// Mutex를 적용하면 read할때도 lock을 걸어야 하기 때문에 사용하지 않음.
 pub struct WorldInterface {
+    /// raw pointer가 future간 이동이 안돼서, usize타입으로 변환하여 사용
     world: WorldPointer,
 }
 
@@ -81,6 +82,7 @@ impl WorldInterface {
         }
     }
 
+    /// id가 겹치지 않음을 사용하는쪽에서 보장해야 함.
     pub async fn add_player(&self, id: u32) {
         self.as_mut().add_player(id);
     }
@@ -89,6 +91,8 @@ impl WorldInterface {
         self.as_mut().move_player(id, x, y);
     }
 
+    /// #### update_message와 동시 호출테스트
+    /// dummy_client가 터진다?
     pub async fn remove_player(&self, id: u32) {
         self.as_mut().remove_player(id);
     }
