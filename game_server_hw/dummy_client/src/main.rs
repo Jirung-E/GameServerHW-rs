@@ -9,6 +9,7 @@ use tokio::{
     net::TcpStream,
     io::{AsyncReadExt, AsyncWriteExt},
 };
+use rand::Rng;
 use get_addr::get_addr;
 use network::PacketParser;
 
@@ -28,7 +29,7 @@ struct Server {
     packet_parser: PacketParser,
     pps: u32,
 
-    prev_update: std::time::Instant,
+    timer: std::time::Instant,
 }
 
 impl Server {
@@ -51,7 +52,7 @@ impl Server {
             packet_parser: PacketParser::new(),
             pps: 0,
 
-            prev_update: std::time::Instant::now(),
+            timer: std::time::Instant::now(),
         }
     }
 
@@ -139,14 +140,28 @@ impl Server {
 
         while let Some(msg) = self.packet_parser.pop() {
             self.pps += 1;
-            if self.prev_update.elapsed().as_secs() >= 1 {
-                println!("server {} pps: {}", self.player_id, self.pps);
-                self.pps = 0;
-                self.prev_update = std::time::Instant::now();
-            }
             
             let msg = String::from_utf8_lossy(&msg);
             self.process_message(&msg);
+        }
+
+        if self.timer.elapsed().as_millis() >= 1000 {
+            let mut rng = rand::thread_rng();
+            let (x, z) = match rng.gen_range(0..4) {
+                0 => (1, 0),
+                1 => (0, 1),
+                2 => (-1, 0),
+                3 => (0, -1),
+                _ => (0, 0),
+            };
+
+            let move_msg = format!("move {} {x} {z}\n", self.player_id);
+            self.stream.write_all(move_msg.as_bytes()).await
+                .expect("Failed to write to stream");
+
+            println!("server {} pps: {}", self.player_id, self.pps);
+            self.pps = 0;
+            self.timer = std::time::Instant::now();
         }
     }
 }
@@ -157,7 +172,7 @@ use futures::future::join_all;
 
 #[tokio::main]
 async fn main() {
-    let servers = (0..100).map(|_| new_server());
+    let servers = (0..10).map(|_| new_server());
     join_all(servers).await;
 
     println!("done");
