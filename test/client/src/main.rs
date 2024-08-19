@@ -1,6 +1,14 @@
 use std::net::TcpStream;
 use std::io::{Read, Write};
-use std::str::from_utf8;
+use std::time::SystemTime;
+
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct Protocol {
+    time: u128,
+    msg: String,
+}
+
 
 fn main() {
     println!("[Client]");
@@ -15,19 +23,25 @@ fn main() {
             loop {
                 let mut msg = String::from("");
                 std::io::stdin().read_line(&mut msg).unwrap();
+
+                let time = SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis();
+                let msg = Protocol { time, msg };
             
-                stream.write(msg.as_bytes()).unwrap();
+                stream.write(&bincode::serialize(&msg).unwrap()).unwrap();
 
                 let mut data = [0 as u8; 1000]; 
                 match stream.read(&mut data) {
                     Ok(_) => {
-                        if &data == msg.as_bytes() {
-                            let text2 = from_utf8(&data).unwrap();
-                            print!("recv : {text2}end");
-                        } else {
-                            let text = from_utf8(&data).unwrap();
-                            println!("[echo server] : {}", text);
-                        }
+                        let msg: Protocol = bincode::deserialize(&data).unwrap();
+                        let text = msg.msg;
+                        let elapsed = SystemTime::now()
+                            .duration_since(SystemTime::UNIX_EPOCH)
+                            .unwrap()
+                            .as_millis() - time;
+                        println!("[{}ms] Response: {}", elapsed, text);
                     },
                     Err(e) => {
                         println!("Failed to receive data: {}", e);

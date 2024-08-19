@@ -1,15 +1,23 @@
 use std::thread;
 use std::net::{TcpListener, TcpStream, Shutdown};
 use std::io::{Read, Write};
-use std::str::from_utf8;
+
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct Protocol {
+    time: u128,
+    msg: String,
+}
+
 
 fn handle_client(mut stream: TcpStream) {
     let mut data = [0 as u8; 1000]; 
     while match stream.read(&mut data) {
         Ok(_size) => {
-            let text = from_utf8(&data).unwrap();
+            let msg: Protocol = bincode::deserialize(&data).unwrap();
+            let text = msg.msg;
             print!("[{}] : {}", stream.peer_addr().unwrap(), text);
-            stream.write(text.as_bytes()).unwrap();
+            stream.write(&data).unwrap();
             true
         },
         Err(_) => {
@@ -19,6 +27,7 @@ fn handle_client(mut stream: TcpStream) {
         }
     } {}
 }
+
 
 fn main() {
     println!("[Server]");
