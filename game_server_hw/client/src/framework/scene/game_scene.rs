@@ -13,7 +13,7 @@ use std::{
     iter::IntoIterator,
 };
 use get_addr::get_addr;
-use network::PacketParser;
+use network::*;
 
 use super::super::{
     camera::{Camera, CameraComponent, DefaultCamera},
@@ -165,12 +165,6 @@ impl GameScene {
             return;
         }
 
-        if msg[0] != "GAMESERVER" {
-            return;
-        }
-
-        let msg = &msg[1..];
-
         match msg[0] {
             "init" => {
                 if msg.len() < 2 {
@@ -245,7 +239,8 @@ impl GameScene {
 
                 // println!("{}", self.stream.peer_addr().unwrap());
                 let msg = format!("move {} {} {}\n", self.player_id, direction.x, direction.y);
-                self.stream.write_all(msg.as_bytes())
+                let packet = MessagePacket::new(0, &msg);
+                self.stream.write_all(&packet.as_bytes())
                     .expect("Failed to write to stream");
 
                 println!("Sent ok");
@@ -279,7 +274,8 @@ impl Scene for GameScene {
     }
 
     fn update(&mut self) {
-        self.stream.write_all(b"update\n")
+        let packet = MessagePacket::new(0, "update");
+        self.stream.write_all(&packet.as_bytes())
             .expect("Failed to write to stream");
 
         self.pull_messages();
