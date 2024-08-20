@@ -132,6 +132,11 @@ impl Server {
         self.pull_messages().await;
 
         while let Some(packet) = self.packet_parser.pop() {
+            let packet = match MessagePacket::from_raw(packet) {
+                Ok(packet) => packet,
+                Err(_) => continue,
+            };
+            
             let msg = packet.msg();
             self.process_message(&msg);
 

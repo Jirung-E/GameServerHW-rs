@@ -6,7 +6,7 @@ use super::protocol::*;
 
 #[derive(Debug, PartialEq)]
 pub enum Packet {
-    Complete(MessagePacket),        // TODO: RawPacket으로 바꿔야함
+    Complete(RawPacket),
     Incomplete(Bytes),
 }
 
@@ -56,7 +56,7 @@ impl PacketParser {
             
             len = data.len();
 
-            let packet = match MessagePacket::from_bytes(&packet) {     // TODO: RawPacket으로 바꿔야함
+            let packet = match RawPacket::from_bytes(&packet) {
                 Ok(packet) => Complete(packet),
                 Err(_) => continue,     // 알 수 없는 패킷은 버림
             };
@@ -67,7 +67,7 @@ impl PacketParser {
 
     /// 한개 남았을 때 Incomplete이면 아직 완성 안된것이므로 pop하지 않음.  
     /// 두개 이상 남았을때 제일 앞 패킷이 Incomplete이면 모종의 이유로 완성 안된것이므로 값을 버리기 위해 pop.  
-    pub fn pop(&mut self) -> Option<MessagePacket> {
+    pub fn pop(&mut self) -> Option<RawPacket> {
         if self.queue.len() == 1 {
             if let Some(Incomplete(_)) = self.queue.front() {
                 return None;
@@ -136,15 +136,15 @@ mod tests {
     fn test_parse() {
         let mut parser = PacketParser::new();
 
-        let packet = MessagePacket::new(0, "update");
+        let packet = RawPacket::new(b"update");
         parser.push(&packet.as_bytes());
         assert_eq!(parser.pop(), Some(packet));
 
-        let packet = MessagePacket::new(0, "remove");
+        let packet = RawPacket::new(b"remove");
         parser.push(&packet.as_bytes());
         assert_eq!(parser.pop(), Some(packet));
 
-        let packet = MessagePacket::new(0, "init 3 2 5 6");
+        let packet = RawPacket::new(b"init 3 2 5 6");
         parser.push(&packet.as_bytes());
         assert_eq!(parser.pop(), Some(packet));
     }
@@ -154,7 +154,7 @@ mod tests {
         let mut parser = PacketParser::new();
 
         {
-            let packet = MessagePacket::new(0, "update");
+            let packet = RawPacket::new(b"update");
             let bytes = packet.as_bytes();
             parser.push(&bytes[..3]);
             assert_eq!(parser.iter().last(), Some(&Incomplete(bytes[..3].to_vec().into())));
@@ -167,23 +167,23 @@ mod tests {
         }
 
         {
-            let packet = MessagePacket::new(0, "remove");
+            let packet = RawPacket::new(b"remove");
             let bytes = packet.as_bytes();
-            parser.push(&bytes[..21]);
-            assert_eq!(parser.iter().last(), Some(&Incomplete(bytes[..21].to_vec().into())));
+            parser.push(&bytes[..6]);
+            assert_eq!(parser.iter().last(), Some(&Incomplete(bytes[..6].to_vec().into())));
             assert_eq!(parser.pop(), None);
 
-            parser.push(&bytes[21..]);
+            parser.push(&bytes[6..]);
             assert_eq!(parser.iter().last(), Some(&Complete(packet)));
             // assert_eq!(parser.pop(), Some(packet));
             parser.pop();
         }
 
         {
-            let packet1 = MessagePacket::new(0, "init 3 2 5 6");
-            let packet2 = MessagePacket::new(0, "update");
-            let packet3 = MessagePacket::new(0, "update");
-            let packet4 = MessagePacket::new(0, "remove");
+            let packet1 = RawPacket::new(b"init 3 2 5 6");
+            let packet2 = RawPacket::new(b"update");
+            let packet3 = RawPacket::new(b"update");
+            let packet4 = RawPacket::new(b"remove");
             let bytes1 = packet1.as_bytes();
             let bytes2 = packet2.as_bytes();
             let bytes3 = packet3.as_bytes();
