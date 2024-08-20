@@ -3,7 +3,8 @@
 use std::{
     rc::Rc, 
     cell::RefCell, 
-    collections::HashMap,
+    collections::HashMap, 
+    time::{SystemTime, UNIX_EPOCH},
 };
 use tokio::{
     net::TcpStream,
@@ -11,7 +12,7 @@ use tokio::{
 };
 use rand::Rng;
 use get_addr::get_addr;
-use network::PacketParser;
+use network::*;
 
 
 struct Player {
@@ -27,9 +28,8 @@ struct Server {
     addr: String,
     stream: TcpStream,
     packet_parser: PacketParser,
-    pps: u32,
 
-    timer: std::time::Instant,
+    timer: SystemTime,
 }
 
 impl Server {
@@ -50,9 +50,8 @@ impl Server {
             addr,
             stream,
             packet_parser: PacketParser::new(),
-            pps: 0,
 
-            timer: std::time::Instant::now(),
+            timer: SystemTime::now(),
         }
     }
 
@@ -83,12 +82,6 @@ impl Server {
             return;
         }
 
-        if msg[0] != "GAMESERVER" {
-            return;
-        }
-
-        let msg = &msg[1..];
-
         match msg[0] {
             "init" => {
                 if msg.len() < 2 {
@@ -102,11 +95,6 @@ impl Server {
                 if msg.len() < 2 {
                     return;
                 }
-
-                // let time = std::time::Instant::now();
-                // let elapsed = time.duration_since(self.prev_update);
-                // println!("Elapsed(id: {}): {:?}", self.player_id, elapsed);
-                // self.prev_update = time;
 
                 let num_objects = msg[1].parse::<usize>().unwrap();
                 let mut valid_ids: Vec<u32> = Vec::new();
@@ -133,19 +121,30 @@ impl Server {
     }
 
     async fn update(&mut self) {
-        self.stream.write_all(b"update\n").await
+        let now = std::time::SystemTime::now()
+            .duration_since(UNIX_EPOCH).unwrap()
+            .as_millis();
+        let packet = MessagePacket::new(now, "update");
+
+        self.stream.write_all(&packet.as_bytes()).await
             .expect("Failed to write to stream");
 
         self.pull_messages().await;
 
-        while let Some(msg) = self.packet_parser.pop() {
-            self.pps += 1;
-            
-            let msg = String::from_utf8_lossy(&msg);
+        while let Some(packet) = self.packet_parser.pop() {
+            let msg = packet.msg();
             self.process_message(&msg);
+
+            if self.timer.elapsed().unwrap().as_secs() >= 1 {
+                self.timer = SystemTime::now();
+                let latency = self.timer
+                    .duration_since(UNIX_EPOCH).unwrap()
+                    .as_millis() - packet.time();
+                println!("server {} latency: {}ms", self.player_id, latency);
+            }
         }
 
-        if self.timer.elapsed().as_millis() >= 1000 {
+        if self.timer.elapsed().unwrap().as_millis() >= 1000 {
             let mut rng = rand::thread_rng();
             let (x, z) = match rng.gen_range(0..4) {
                 0 => (1, 0),
@@ -156,12 +155,9 @@ impl Server {
             };
 
             let move_msg = format!("move {} {x} {z}\n", self.player_id);
-            self.stream.write_all(move_msg.as_bytes()).await
+            let packet = MessagePacket::new(now, &move_msg);
+            self.stream.write_all(&packet.as_bytes()).await
                 .expect("Failed to write to stream");
-
-            println!("server {} pps: {}", self.player_id, self.pps);
-            self.pps = 0;
-            self.timer = std::time::Instant::now();
         }
     }
 }
@@ -172,7 +168,7 @@ use futures::future::join_all;
 
 #[tokio::main]
 async fn main() {
-    let servers = (0..10).map(|_| new_server());
+    let servers = (0..1000).map(|_| new_server());
     join_all(servers).await;
 
     println!("done");

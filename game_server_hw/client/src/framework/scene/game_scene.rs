@@ -284,8 +284,8 @@ impl Scene for GameScene {
 
         self.pull_messages();
 
-        while let Some(msg) = self.packet_parser.pop() {
-            let msg = String::from_utf8_lossy(&msg);
+        while let Some(packet) = self.packet_parser.pop() {
+            let msg = packet.msg();
             self.process_message(&msg);
         }
 
