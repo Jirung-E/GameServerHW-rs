@@ -4,5 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bytes = "1.7.1"
 bytemuck = { version = "1.17.0", features = ["derive"] }

@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use std::collections::VecDeque;
 use std::mem::size_of;
 
@@ -8,7 +7,7 @@ use super::protocol::*;
 #[derive(Debug, PartialEq)]
 pub enum Packet {
     Complete(RawPacket),
-    Incomplete(Bytes),
+    Incomplete(Vec<u8>),
 }
 
 
@@ -42,14 +41,14 @@ impl PacketParser {
         let mut len = data.len();
         while len > 0 {
             if len < 2 {
-                self.queue.push_back(Incomplete(data.into()));
+                self.queue.push_back(Incomplete(data));
                 break;
             }
 
             let size = *bytemuck::from_bytes::<PacketSize>(&data[0..size_of::<PacketSize>()]) as usize;
             
             if len < size {
-                self.queue.push_back(Incomplete(data.into()));
+                self.queue.push_back(Incomplete(data));
                 break;
             }
 
@@ -158,7 +157,7 @@ mod tests {
             let packet = RawPacket::new(PacketType::MESSAGE, b"update");
             let bytes = packet.as_bytes();
             parser.push(&bytes[..3]);
-            assert_eq!(parser.iter().last(), Some(&Incomplete(bytes[..3].to_vec().into())));
+            assert_eq!(parser.iter().last(), Some(&Incomplete(bytes[..3].to_vec())));
             assert_eq!(parser.pop(), None);
 
             parser.push(&bytes[3..]);
@@ -171,7 +170,7 @@ mod tests {
             let packet = RawPacket::new(PacketType::MESSAGE, b"remove");
             let bytes = packet.as_bytes();
             parser.push(&bytes[..6]);
-            assert_eq!(parser.iter().last(), Some(&Incomplete(bytes[..6].to_vec().into())));
+            assert_eq!(parser.iter().last(), Some(&Incomplete(bytes[..6].to_vec())));
             assert_eq!(parser.pop(), None);
 
             parser.push(&bytes[6..]);
@@ -199,13 +198,13 @@ mod tests {
             let cut = bytes1.len() + bytes2.len() + bytes3.len() + bytes4.len() / 2;
 
             parser.push(&chained[..cut]);
-            assert_eq!(parser.iter().last(), Some(&Incomplete(bytes4[..bytes4.len() / 2].to_vec().into())));
+            assert_eq!(parser.iter().last(), Some(&Incomplete(bytes4[..bytes4.len() / 2].to_vec())));
 
             let mut quess = vec![
                 Complete(packet1),
                 Complete(packet2),
                 Complete(packet3),
-                Incomplete(bytes4[..bytes4.len() / 2].to_vec().into()),
+                Incomplete(bytes4[..bytes4.len() / 2].to_vec()),
             ];
 
             for it in parser.iter().zip(quess.iter()) {
