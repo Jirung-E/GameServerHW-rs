@@ -33,7 +33,7 @@ impl Client {
 
         let packet = MessagePacket::new(0, format!("init {}", self.id).as_str());
 
-        match self.stream_write(packet).await {
+        match self.stream_write(packet.as_raw()).await {
             Ok(_) => {
                 // println!("Client {} connected", self.id);
             },
@@ -79,12 +79,12 @@ impl Client {
                 Err(_) => continue,
             };
             
-            let msg = packet.msg();
+            let msg = packet.msg;
 
             if let Some(response) = self.process_message(&msg).await {
-                let packet = MessagePacket::new(packet.time(), &response);
+                let packet = MessagePacket::new(packet.time, &response);
 
-                match self.stream_write(packet).await {
+                match self.stream_write(packet.as_raw()).await {
                     Ok(_) => {},
                     Err(_) => {
                         self.running = false;
@@ -123,7 +123,7 @@ impl Client {
         }
     }
 
-    async fn stream_write(&mut self, packet: MessagePacket) -> Result<(), std::io::Error> {
+    async fn stream_write(&mut self, packet: RawPacket) -> Result<(), std::io::Error> {
         self.stream.write_all(&packet.as_bytes()).await
     }
 }

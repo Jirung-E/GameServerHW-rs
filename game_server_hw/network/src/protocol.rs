@@ -1,21 +1,40 @@
 use std::mem::size_of;
 
 
-type PacketSizeType = u16;
+#[repr(C, packed)]
+#[derive(Debug, PartialEq, Copy, Clone, bytemuck::Zeroable, bytemuck::Pod)]
+pub struct PacketType(u8);
+impl PacketType {
+    pub const RAW: Self = Self(0);
+    pub const MESSAGE: Self = Self(1);
+}
+
+pub type PacketSize = u16;
 
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
+#[repr(C, packed)]
+#[derive(Debug, PartialEq, Copy, Clone, bytemuck::Zeroable, bytemuck::Pod)]
+pub struct PacketHeader {
+    size: PacketSize,
+    packet_type: PacketType,
+}
+
+
+#[derive(Debug, PartialEq)]
 pub struct RawPacket {
-    size: PacketSizeType,
+    header: PacketHeader,
     data: Vec<u8>,
 }
 
 impl RawPacket {
-    pub fn new(data: &[u8]) -> Self {
-        let size = size_of::<PacketSizeType>() + data.len();
+    pub fn new(packet_type: PacketType, data: &[u8]) -> Self {
+        let size = (size_of::<PacketHeader>() + data.len()) as PacketSize;
 
         Self {
-            size: size as PacketSizeType,
+            header: PacketHeader {
+                size,
+                packet_type,
+            },
             data: data.to_vec(),
         }
     }
@@ -25,107 +44,61 @@ impl RawPacket {
     }
 
     pub fn as_bytes(&self) -> Vec<u8> {
-        let mut data = bincode::serialize(&self.size).unwrap();
+        let mut data = bytemuck::bytes_of(&self.header).to_vec();
         data.extend_from_slice(&self.data);
 
         data
     }
 
-    pub fn from_bytes(data: &[u8]) -> Result<Self, bincode::Error> {
-        if data.len() < size_of::<PacketSizeType>() {
-            return Err(bincode::Error::from(bincode::ErrorKind::SizeLimit));
+    pub fn from_bytes(data: &[u8]) -> Result<Self, std::io::Error> {
+        if data.len() < size_of::<PacketHeader>() {
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid data"));
         }
 
-        let size: PacketSizeType = bincode::deserialize(&data[0..2])?;
-        if data.len() < size as usize {
-            return Err(bincode::Error::from(bincode::ErrorKind::SizeLimit));
+        let header = *bytemuck::from_bytes::<PacketHeader>(&data[0..size_of::<PacketHeader>()]);
+        if data.len() < header.size as usize {
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid data"));
         }
 
-        let data = data[2..size as usize].to_vec();
+        let data = data[size_of::<PacketHeader>()..header.size as usize].to_vec();
 
         Ok(Self {
-            size,
+            header,
             data,
         })
     }
 }
 
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct MessagePacket {
-    size: PacketSizeType,      // u8로는 부족함
-    time: u128,
-    msg: String,
+    pub time: u128,
+    pub msg: String,
 }
 
 impl MessagePacket {
     pub fn new(time: u128, msg: &str) -> Self {
-        let msg = msg.to_string();
-
         Self {
-            size: (size_of::<PacketSizeType>()
-                + size_of::<u128>() 
-                + msg.len()) as PacketSizeType,
             time,
-            msg,
+            msg: msg.to_string(),
         }
     }
 
-    pub fn time(&self) -> u128 {
-        self.time
-    }
-
-    pub fn msg(&self) -> &str {
-        &self.msg
-    }
-
-    pub fn as_bytes(&self) -> Vec<u8> {
-        let mut data = bincode::serialize(&self.size).unwrap();
-        
-        let time = bincode::serialize(&self.time).unwrap();
-        data.extend_from_slice(&time);
-
-        let msg = self.msg.as_bytes();
-        data.extend_from_slice(msg);
-
-        data
-    }
-
-    pub fn from_bytes(data: &[u8]) -> Result<Self, bincode::Error> {
-        if data.len() < size_of::<u16>() + size_of::<u128>() {
-            return Err(bincode::Error::from(bincode::ErrorKind::SizeLimit));
-        }
-
-        let size: u16 = bincode::deserialize(&data[0..2])?;
-        if data.len() < size as usize {
-            return Err(bincode::Error::from(bincode::ErrorKind::SizeLimit));
-        }
-
-        let time = bincode::deserialize(&data[2..size_of::<u128>() + 2])?;
-        let msg = String::from_utf8_lossy(&data[size_of::<u128>() + 2..size as usize]).to_string();
-
-        Ok(Self {
-            size,
-            time,
-            msg,
-        })
-    }
-
-    pub fn from_raw(raw: RawPacket) -> Result<Self, bincode::Error> {
+    pub fn from_raw(raw: RawPacket) -> Result<Self, std::io::Error> {
         if raw.data().len() < size_of::<u128>() {
-            return Err(bincode::Error::from(bincode::ErrorKind::SizeLimit));
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid data"));
         }
         
-        let time = bincode::deserialize(&raw.data()[0..size_of::<u128>()])?;
+        let time = *bytemuck::from_bytes::<u128>(&raw.data()[0..size_of::<u128>()]);
         let msg = String::from_utf8_lossy(&raw.data()[size_of::<u128>()..]);
 
         Ok(Self::new(time, &msg))
     }
 
     pub fn as_raw(&self) -> RawPacket {
-        let mut data = bincode::serialize(&self.time).unwrap();
+        let mut data = bytemuck::bytes_of(&self.time).to_vec();
         data.extend_from_slice(self.msg.as_bytes());
 
-        RawPacket::new(&data)
+        RawPacket::new(PacketType::MESSAGE, &data)
     }
 }

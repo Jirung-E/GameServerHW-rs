@@ -124,7 +124,7 @@ impl Server {
         let now = std::time::SystemTime::now()
             .duration_since(UNIX_EPOCH).unwrap()
             .as_millis();
-        let packet = MessagePacket::new(now, "update");
+        let packet = MessagePacket::new(now, "update").as_raw();
 
         self.stream.write_all(&packet.as_bytes()).await
             .expect("Failed to write to stream");
@@ -137,14 +137,14 @@ impl Server {
                 Err(_) => continue,
             };
             
-            let msg = packet.msg();
+            let msg = packet.msg;
             self.process_message(&msg);
 
             if self.timer.elapsed().unwrap().as_secs() >= 1 {
                 self.timer = SystemTime::now();
                 let latency = self.timer
                     .duration_since(UNIX_EPOCH).unwrap()
-                    .as_millis() - packet.time();
+                    .as_millis() - packet.time;
                 println!("server {} latency: {}ms", self.player_id, latency);
             }
         }
@@ -160,7 +160,7 @@ impl Server {
             };
 
             let move_msg = format!("move {} {x} {z}\n", self.player_id);
-            let packet = MessagePacket::new(now, &move_msg);
+            let packet = MessagePacket::new(now, &move_msg).as_raw();
             self.stream.write_all(&packet.as_bytes()).await
                 .expect("Failed to write to stream");
         }
@@ -173,7 +173,7 @@ use futures::future::join_all;
 
 #[tokio::main]
 async fn main() {
-    let servers = (0..1000).map(|_| new_server());
+    let servers = (0..100).map(|_| new_server());
     join_all(servers).await;
 
     println!("done");

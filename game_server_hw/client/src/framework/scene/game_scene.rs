@@ -239,7 +239,7 @@ impl GameScene {
 
                 // println!("{}", self.stream.peer_addr().unwrap());
                 let msg = format!("move {} {} {}\n", self.player_id, direction.x, direction.y);
-                let packet = MessagePacket::new(0, &msg);
+                let packet = MessagePacket::new(0, &msg).as_raw();
                 self.stream.write_all(&packet.as_bytes())
                     .expect("Failed to write to stream");
 
@@ -274,7 +274,7 @@ impl Scene for GameScene {
     }
 
     fn update(&mut self) {
-        let packet = MessagePacket::new(0, "update");
+        let packet = MessagePacket::new(0, "update").as_raw();
         self.stream.write_all(&packet.as_bytes())
             .expect("Failed to write to stream");
 
@@ -286,7 +286,7 @@ impl Scene for GameScene {
                 _ => continue,
             };
             
-            let msg = packet.msg();
+            let msg = packet.msg;
             self.process_message(&msg);
         }
 
